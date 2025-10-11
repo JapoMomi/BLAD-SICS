@@ -1,6 +1,7 @@
 import os
 import csv
 import torch
+import random
 import matplotlib.pyplot as plt
 from datasets import Dataset, DatasetDict
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Trainer, TrainingArguments
@@ -79,29 +80,26 @@ tokenized_datasets = dataset.map(preprocess_function, batched=True, remove_colum
 # ------------------------
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
-# -------
-# args: 
-#   - eval_strategy="epoch", 
-#   - learning_rate=3e-4, 
-#   - per_device_train_batch_size=16,
-#   - per_device_eval_batch_size=16,    ---> results: 
-#   - weight_decay=0.01,
-#   - num_train_epochs=3,
-#   - fp16=False, 
-# -------
 training_args = TrainingArguments(
     output_dir="/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project/byt5_modbus_small",
-    eval_strategy="epoch", # da guardare
-    learning_rate=3e-4, # provare 1e-4
-    per_device_train_batch_size=16,
+    eval_strategy="epoch",
+    save_strategy="epoch",
+    learning_rate=3e-4,                    
+    lr_scheduler_type="cosine",             
+    warmup_ratio=0.1,                       
+    per_device_train_batch_size=8,          
     per_device_eval_batch_size=16,
-    weight_decay=0.01,
+    gradient_accumulation_steps=4,         
+    weight_decay=0.05,                      
+    num_train_epochs=5,                     
+    fp16=False,                             
     save_total_limit=2,
-    num_train_epochs=1,
-    fp16=False, # provare true
+    load_best_model_at_end=True,           
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
     logging_dir="/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project/logs",
+    logging_steps=50,
     report_to="tensorboard",
-    logging_steps=50,                # log every 50 steps
 )
 
 trainer = Trainer(
@@ -177,7 +175,8 @@ plt.show()
 
 # Print example predictions
 print("\nExample predictions:")
-for i in range(10):
+sample_indices = random.sample(range(len(dataset["test"])), 10)
+for i in sample_indices:
     print(f"Input: {dataset['test'][i]['input']}")
     print(f"Expected: {references_clean[i]} | Predicted: {predictions_clean[i]}")
     print("-" * 50)

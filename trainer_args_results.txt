@@ -1,0 +1,41 @@
+# ------- 
+#   - eval_strategy="epoch", 
+#   - learning_rate=3e-4, 
+#   - per_device_train_batch_size=16,
+#   - per_device_eval_batch_size=16,    ---> results: Accuracy:  0.820
+#   - weight_decay=0.01,                              Precision: 0.698
+#   - num_train_epochs=3,                             Recall:    0.820  
+#   - fp16=False,                                     F1 Score:  0.752  
+# -------
+#   - eval_strategy="epoch", 
+#   - learning_rate=1e-4, 
+#   - per_device_train_batch_size=16,
+#   - per_device_eval_batch_size=16,    ---> results: Accuracy: 0.919
+#   - weight_decay=0.01,                              Precision: 0.918
+#   - num_train_epochs=3,                             Recall: 0.919    
+#   - fp16=False,                                     F1 Score: 0.906  
+# -------
+#   - eval_strategy="epoch", 
+#   - learning_rate=2e-4, 
+#   - per_device_train_batch_size=16,
+#   - per_device_eval_batch_size=16,    ---> results: Accuracy: 0.909
+#   - weight_decay=0.01,                              Precision: 0.885
+#   - num_train_epochs=2,                             Recall: 0.909    
+#   - fp16=False,                                     F1 Score: 0.886  
+# -------
+#   Stored in the directories byt5_modbus_small_tuned
+#    eval_strategy="epoch",
+#    save_strategy="epoch",
+#    learning_rate=3e-4,                    
+#    lr_scheduler_type="cosine",             
+#    warmup_ratio=0.1,                       
+#    per_device_train_batch_size=8,          
+#    per_device_eval_batch_size=16,         ---> results: Accuracy: 0.924                         
+#    gradient_accumulation_steps=4,                       Precision: 0.925
+#    weight_decay=0.05,                                   Recall: 0.924
+#    num_train_epochs=5,                                  F1 Score: 0.909
+#    fp16=False,                             
+#    save_total_limit=2,
+#    load_best_model_at_end=True,           
+#    metric_for_best_model="eval_loss",
+#    greater_is_better=False,
