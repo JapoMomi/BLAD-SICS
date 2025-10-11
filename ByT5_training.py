@@ -11,9 +11,9 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, con
 # Disable W&B (force TensorBoard logging)
 # ------------------------
 os.environ["WANDB_DISABLED"] = "true"   # turn off W&B
-os.environ["HF_LOGGING"] = "tensorboard"  # ensure Trainer uses tensorboard
+os.environ["HF_LOGGING"] = "tensorboard"  # Trainer uses tensorboard
 
-DATA_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/IanRawDataset.txt"
+DATA_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/normal_traffic.txt"
 
 # ------------------------
 # Load raw dataset
@@ -60,7 +60,7 @@ model_name = "google/byt5-small"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
-max_input_length = 256
+max_input_length = 384
 max_target_length = 16
 
 def preprocess_function(examples):
@@ -81,17 +81,19 @@ tokenized_datasets = dataset.map(preprocess_function, batched=True, remove_colum
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
 training_args = TrainingArguments(
-    output_dir="/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project/byt5_modbus_small",
+    output_dir="/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project/byt5_modbus_small_tuned", # checkpoint dir
     eval_strategy="epoch",
     save_strategy="epoch",
-    learning_rate=3e-4,                    
-    lr_scheduler_type="cosine",             
-    warmup_ratio=0.1,                       
+    learning_rate=2e-4,                    
+    lr_scheduler_type="cosine_with_restarts",             
+    warmup_ratio=0.08,                       
     per_device_train_batch_size=8,          
     per_device_eval_batch_size=16,
-    gradient_accumulation_steps=4,         
-    weight_decay=0.05,                      
-    num_train_epochs=5,                     
+    gradient_accumulation_steps=8,         
+    weight_decay=0.08,
+    label_smoothing_factor=0.1,                      
+    num_train_epochs=6,  
+    max_grad_norm=1.0,                   
     fp16=False,                             
     save_total_limit=2,
     load_best_model_at_end=True,           
@@ -116,8 +118,8 @@ trainer = Trainer(
 # ------------------------
 trainer.train()
 # Save final model
-trainer.save_model("/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project/byt5_modbus_small_final")
-tokenizer.save_pretrained("/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project/byt5_modbus_small_final")
+trainer.save_model("/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project/byt5_modbus_small_final_tuned")
+tokenizer.save_pretrained("/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project/byt5_modbus_small_final_tuned")
 
 # ------------------------
 # Test
@@ -167,11 +169,11 @@ print(f"Recall:    {recall:.3f}")
 print(f"F1 Score:  {f1:.3f}")
 
 # Confusion matrix
-cm = confusion_matrix(references_clean, predictions_clean, labels=list(range(8)))
-disp = ConfusionMatrixDisplay(cm, display_labels=[f"Class {i}" for i in range(8)])
-disp.plot(cmap="Blues", xticks_rotation="vertical")
-plt.title("ByT5-small Modbus RTU Multi-class Intrusion Detection Results")
-plt.show()
+#cm = confusion_matrix(references_clean, predictions_clean, labels=list(range(8)))
+#disp = ConfusionMatrixDisplay(cm, display_labels=[f"Class {i}" for i in range(8)])
+#disp.plot(cmap="Blues", xticks_rotation="vertical")
+#plt.title("ByT5-small Modbus RTU Multi-class Intrusion Detection Results")
+#plt.show()
 
 # Print example predictions
 print("\nExample predictions:")
