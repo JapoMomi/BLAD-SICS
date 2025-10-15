@@ -31,11 +31,19 @@ with open(DATA_PATH, "r") as f:
 # Build Hugging Face dataset and split (90% train, 10% val)
 # ------------------------
 raw_dataset = Dataset.from_dict({"input": inputs, "target": targets})
-train_dataset, val_dataset = raw_dataset.train_test_split(test_size=0.1, seed=42).values()
-
+# First split: Train + Temp (Val + Test)
+train_dataset, temp_dataset = raw_dataset.train_test_split(test_size=0.2, seed=42).values()
+# Second split: Validation + Test (from Temp)
+val_dataset, test_dataset = temp_dataset.train_test_split(test_size=0.75, seed=42).values()
+# ------------------------
+# dataset["train"] → 80%
+# dataset["validation"] → 15%
+# dataset["test"] → 5%
+# ------------------------
 dataset = DatasetDict({
     "train": train_dataset,
-    "validation": val_dataset
+    "validation": val_dataset,
+    "test": test_dataset
 })
 
 # ------------------------
@@ -113,10 +121,10 @@ model.to(device)
 
 # Show a few reconstruction examples
 print("\n🔍 Example reconstructions (input vs output):")
-sample_indices = random.sample(range(len(dataset["validation"])), 10)
+sample_indices = random.sample(range(len(dataset["test"])), 10)
 
 for i in sample_indices:
-    sample_input = dataset["validation"][i]["input"]
+    sample_input = dataset["test"][i]["input"]
     inputs = tokenizer(sample_input, return_tensors="pt").to(device)
     outputs = model.generate(**inputs)
     reconstructed = tokenizer.decode(outputs[0], skip_special_tokens=True)
