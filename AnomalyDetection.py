@@ -81,17 +81,24 @@ encoder = model.get_encoder()
 # ======================================================
 # BATCHED EMBEDDING EXTRACTION
 # ======================================================
-def get_embeddings_batch(sequences, batch_size=32):
+def get_embeddings_batch(sequences, batch_size=16, last_n_layers=3):
     all_embs = []
-    for i in tqdm(range(0, len(sequences), batch_size), desc="Extracting embeddings (batched)"):
+    for i in tqdm(range(0, len(sequences), batch_size), desc="Extracting embeddings (efficient)"):
         batch = sequences[i:i+batch_size]
         inputs = tokenizer(batch, return_tensors="pt", truncation=True,
                            padding=True, max_length=MAX_LEN).to(device)
+
         with torch.no_grad():
-            out = encoder(**inputs)
-            hidden = out.last_hidden_state.mean(dim=1).cpu().numpy()
-        all_embs.append(hidden)
+            outputs = encoder(**inputs, output_hidden_states=True)
+            # take last n layers and average across them and tokens
+            hidden_states = outputs.hidden_states[-last_n_layers:]
+            hidden_mean = torch.stack(hidden_states).mean(0).mean(1)
+            hidden_mean = hidden_mean.cpu().numpy()
+
+        all_embs.append(hidden_mean)
+        torch.cuda.empty_cache()   # prevent accumulation
     return np.vstack(all_embs)
+
 
 # ======================================================
 # LOAD + GROUP DATA
