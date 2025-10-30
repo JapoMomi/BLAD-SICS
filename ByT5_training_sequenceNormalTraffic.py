@@ -49,25 +49,17 @@ def group_sequences(packets, timestamps, n_packets, max_time_gap):
             seq.append(packets[j])
             current_ts = timestamps[j]
         # Join packets with a separator token
-        seq_text = " <SEP> ".join(seq)
+        seq_text = "     ".join(seq)
         sequences.append(seq_text)
         start += 1  # shift by 1 to keep overlapping sequences
     return sequences
 
 # Change this value to test different temporal contexts (3, 4, 5, ...)
-N_PACKETS = 3
+N_PACKETS = 4
 MAX_TIME_GAP = 2 #seconds
 sequences = group_sequences(packets, timestamps, n_packets=N_PACKETS, max_time_gap=MAX_TIME_GAP)
 
 print(f"Generated {len(sequences)} sequences with {N_PACKETS} packets each")
-
-#output_path = f"/home/spritz/storage/disk0/Master_Thesis/sequences_{N_PACKETS}pkts.txt"
-#with open(output_path, "w") as f:
-#    for seq in sequences:
-#        f.write(seq + "\n")
-
-#print(f"Sequences saved to: {output_path}")
-#sys.exit(0)
 
 # ------------------------
 # Build Dataset for autoencoding

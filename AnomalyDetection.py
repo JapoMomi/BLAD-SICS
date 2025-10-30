@@ -10,17 +10,19 @@ from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
 from tqdm import tqdm
 import torch.nn.functional as F
 
+
+N_PACKETS = 4          # sequence length
+MAX_GAP = 2            # seconds
+MAX_LEN = 512          # max tokens for tokenizer
+BATCH_SIZE = 32        # for embedding extraction
+LAST_N_LAYERS = 3      # number of last hidden layers taken
+PCA_DIM = 128          # compressed embedding size
+
 # ======================================================
 # CONFIG
 # ======================================================
-MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project-sequences/byt5_modbus_normalTraf_seq_3_final"
+MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project-sequences/byt5_modbus_normalTraf_seq_{N_PACKETS}_final"
 DATA_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/IanRawDataset.txt"
-
-N_PACKETS = 3          # sequence length
-MAX_GAP = 2            # seconds
-MAX_LEN = 768          # max tokens for tokenizer
-BATCH_SIZE = 32        # for embedding extraction
-PCA_DIM = 128          # compressed embedding size
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Running on {device}")
@@ -49,7 +51,7 @@ def load_dataset(path):
 # ======================================================
 # GROUP PACKETS INTO SEQUENCES
 # ======================================================
-def group_sequences(packets, labels, timestamps, n_packets=4, max_time_gap=0.5):
+def group_sequences(packets, labels, timestamps, n_packets=N_PACKETS, max_time_gap=MAX_GAP):
     sequences, seq_labels = [], []
     start = 0
     while start < len(packets):
@@ -64,7 +66,7 @@ def group_sequences(packets, labels, timestamps, n_packets=4, max_time_gap=0.5):
             seq.append(packets[j])
             seq_lbls.append(labels[j])
             current_ts = timestamps[j]
-        seq_text = " <SEP> ".join(seq)
+        seq_text = "     ".join(seq)
         seq_label = 1 if any(l != 0 for l in seq_lbls) else 0
         sequences.append(seq_text)
         seq_labels.append(seq_label)
@@ -81,7 +83,7 @@ encoder = model.get_encoder()
 # ======================================================
 # BATCHED EMBEDDING EXTRACTION
 # ======================================================
-def get_embeddings_batch(sequences, batch_size=16, last_n_layers=3):
+def get_embeddings_batch(sequences, batch_size=BATCH_SIZE, last_n_layers=LAST_N_LAYERS):
     all_embs = []
     for i in tqdm(range(0, len(sequences), batch_size), desc="Extracting embeddings (efficient)"):
         batch = sequences[i:i+batch_size]
@@ -106,13 +108,13 @@ def get_embeddings_batch(sequences, batch_size=16, last_n_layers=3):
 pkts, lbls, ts = load_dataset(DATA_PATH)
 print(f"Loaded {len(pkts)} packets.")
 
-seqs, seq_labels = group_sequences(pkts, lbls, ts, N_PACKETS, MAX_GAP)
+seqs, seq_labels = group_sequences(pkts, lbls, ts)
 print(f"Built {len(seqs)} sequences ({sum(seq_labels)} attacks, {len(seqs)-sum(seq_labels)} normals)")
 
 # ======================================================
 # EMBEDDING EXTRACTION
 # ======================================================
-embeddings = get_embeddings_batch(seqs, BATCH_SIZE)
+embeddings = get_embeddings_batch(seqs)
 y = np.array(seq_labels)
 
 # ======================================================

@@ -1,0 +1,71 @@
+TRAINING DI BYT5 SU SEQUENZE DI 3 PACCHETTI
+
+N_PACKETS = 3          # sequence length
+MAX_GAP = 2            # seconds
+MAX_LEN = 768          # max tokens for tokenizer
+BATCH_SIZE = 32        # for embedding extraction
+LAST_N_LAYERS = 3      # number of last hidden layers taken
+PCA_DIM = 128          # compressed embedding size
+iso = IsolationForest(
+    n_estimators=300,
+    max_samples=0.8,
+    contamination=0.1,
+    max_features=0.8,
+    bootstrap=True,
+    random_state=42
+).fit(emb_train)
+================== SUMMARY ==================
+IsolationForest   → AUC: 0.728, F1: 0.495
+OneClassSVM       → AUC: 0.650, F1: 0.403
+CosineSimilarity  → AUC: 0.548, F1: 0.465
+ReconstructionErr → AUC: 0.562
+Perplexity Score  → AUC: 0.542
+=============================================
+
+N_PACKETS = 4          # sequence length
+MAX_GAP = 2            # seconds
+MAX_LEN = 512          # max tokens for tokenizer
+BATCH_SIZE = 32        # for embedding extraction
+LAST_N_LAYERS = 3      # number of last hidden layers taken
+PCA_DIM = 128          # compressed embedding size
+iso = IsolationForest(
+    n_estimators=300,
+    max_samples=0.8,
+    contamination=0.1,
+    max_features=0.8,
+    bootstrap=True,
+    random_state=42
+).fit(emb_train)
+================== SUMMARY ==================
+IsolationForest   → AUC: 0.730, F1: 0.527
+OneClassSVM       → AUC: 0.630, F1: 0.391
+CosineSimilarity  → AUC: 0.601, F1: 0.547
+ReconstructionErr → AUC: 0.519
+Perplexity Score  → AUC: 0.415
+=============================================
+
+
+######################################################################
+TRAINING DI BYT5 SU SEQUENZE DI 4 PACCHETTI
+
+N_PACKETS = 4          # sequence length
+MAX_GAP = 2            # seconds
+MAX_LEN = 512          # max tokens for tokenizer
+BATCH_SIZE = 32        # for embedding extraction
+LAST_N_LAYERS = 3      # number of last hidden layers taken
+PCA_DIM = 128          # compressed embedding size
+iso = IsolationForest(
+    n_estimators=300,
+    max_samples=0.8,
+    contamination=0.1,
+    max_features=0.8,
+    bootstrap=True,
+    random_state=42
+).fit(emb_train)
+================== SUMMARY ==================
+IsolationForest   → AUC: 0.731, F1: 0.549
+OneClassSVM       → AUC: 0.628, F1: 0.395
+CosineSimilarity  → AUC: 0.622, F1: 0.562
+ReconstructionErr → AUC: 0.573
+Perplexity Score  → AUC: 0.629
+=============================================
