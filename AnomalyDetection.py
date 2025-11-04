@@ -13,15 +13,15 @@ import torch.nn.functional as F
 
 N_PACKETS = 4          # sequence length
 MAX_GAP = 2            # seconds
-MAX_LEN = 512          # max tokens for tokenizer
-BATCH_SIZE = 32        # for embedding extraction
+MAX_LEN = 768          # max tokens for tokenizer
+BATCH_SIZE = 64        # for embedding extraction
 LAST_N_LAYERS = 3      # number of last hidden layers taken
-PCA_DIM = 128          # compressed embedding size
+PCA_DIM = 512          # compressed embedding size
 
 # ======================================================
 # CONFIG
 # ======================================================
-MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project-sequences/byt5_modbus_normalTraf_seq_{N_PACKETS}_final"
+MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project-sequences/byt5_base_modbus_normalTraf_seq_{N_PACKETS}_final"
 DATA_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/IanRawDataset.txt"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

@@ -4,7 +4,11 @@ import torch
 import random
 from datasets import Dataset, DatasetDict
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Trainer, TrainingArguments
-import sys
+
+N_PACKETS = 4
+MAX_TIME_GAP = 2 #seconds
+MAX_LENGTH = 768  # longer since we have multiple packets
+
 # ------------------------
 # Disable W&B and force TensorBoard logging
 # ------------------------
@@ -54,9 +58,6 @@ def group_sequences(packets, timestamps, n_packets, max_time_gap):
         start += 1  # shift by 1 to keep overlapping sequences
     return sequences
 
-# Change this value to test different temporal contexts (3, 4, 5, ...)
-N_PACKETS = 4
-MAX_TIME_GAP = 2 #seconds
 sequences = group_sequences(packets, timestamps, n_packets=N_PACKETS, max_time_gap=MAX_TIME_GAP)
 
 print(f"Generated {len(sequences)} sequences with {N_PACKETS} packets each")
@@ -81,18 +82,16 @@ dataset = DatasetDict({
 # ------------------------
 # Tokenizer & model
 # ------------------------
-model_name = "google/byt5-small"
+model_name = "google/byt5-base"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
-max_length = 768  # longer since we have multiple packets
-
 def preprocess_function(examples):
     model_inputs = tokenizer(
-        examples["input"], max_length=max_length, truncation=True
+        examples["input"], max_length=MAX_LENGTH, truncation=True
     )
     labels = tokenizer(
-        examples["target"], max_length=max_length, truncation=True
+        examples["target"], max_length=MAX_LENGTH, truncation=True
     )
     model_inputs["labels"] = labels["input_ids"]
     return model_inputs
@@ -105,7 +104,7 @@ tokenized_datasets = dataset.map(preprocess_function, batched=True, remove_colum
 data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
 training_args = TrainingArguments(
-    output_dir=f"/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project-sequences/byt5_modbus_normalTraf_seq_{N_PACKETS}",
+    output_dir=f"/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project-sequences/byt5_base_modbus_normalTraf_seq_{N_PACKETS}",
     eval_strategy="epoch",
     save_strategy="epoch",
     learning_rate=1e-4,
@@ -141,7 +140,7 @@ trainer = Trainer(
 trainer.train()
 
 # Save fine-tuned sequence autoencoder
-save_path = f"/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project-sequences/byt5_modbus_normalTraf_seq_{N_PACKETS}_final"
+save_path = f"/home/spritz/storage/disk0/Master_Thesis/ByT5/ByT5-project-sequences/byt5_base_modbus_normalTraf_seq_{N_PACKETS}_final"
 trainer.save_model(save_path)
 #model.save_pretrained(save_path)
 tokenizer.save_pretrained(save_path)
@@ -158,7 +157,7 @@ sample_indices = random.sample(range(len(dataset["test"])), 5)
 for i in sample_indices:
     seq_input = dataset["test"][i]["input"]
     inputs = tokenizer(seq_input, return_tensors="pt").to(device)
-    outputs = model.generate(**inputs, max_length=max_length)
+    outputs = model.generate(**inputs, max_length=MAX_LENGTH)
     reconstructed = tokenizer.decode(outputs[0], skip_special_tokens=True)
     print(f"Original:\n{seq_input}\n")
     print(f"Reconstructed:\n{reconstructed}\n")
