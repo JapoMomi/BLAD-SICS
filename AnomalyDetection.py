@@ -101,25 +101,15 @@ def get_embeddings_batch(sequences, batch_size=BATCH_SIZE, last_n_layers=LAST_N_
         torch.cuda.empty_cache()   # prevent accumulation
     return np.vstack(all_embs)
 
-
-# ======================================================
-# LOAD + GROUP DATA
-# ======================================================
 pkts, lbls, ts = load_dataset(DATA_PATH)
 print(f"Loaded {len(pkts)} packets.")
 
 seqs, seq_labels = group_sequences(pkts, lbls, ts)
 print(f"Built {len(seqs)} sequences ({sum(seq_labels)} attacks, {len(seqs)-sum(seq_labels)} normals)")
 
-# ======================================================
-# EMBEDDING EXTRACTION
-# ======================================================
 embeddings = get_embeddings_batch(seqs)
 y = np.array(seq_labels)
 
-# ======================================================
-# PCA COMPRESSION
-# ======================================================
 print(f"\nApplying PCA → {PCA_DIM} dimensions...")
 pca = PCA(n_components=PCA_DIM, random_state=42)
 embeddings_reduced = pca.fit_transform(embeddings)
@@ -136,7 +126,7 @@ print("\n[IsolationForest] training on normal sequences only...")
 iso = IsolationForest(
     n_estimators=300,
     max_samples=0.8,
-    contamination=0.1,
+    contamination=0.05,
     max_features=0.8,
     bootstrap=True,
     random_state=42

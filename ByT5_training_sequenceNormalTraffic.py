@@ -71,7 +71,7 @@ raw_dataset = Dataset.from_dict({"input": inputs, "target": targets})
 
 # Train/val/test split
 train_dataset, temp_dataset = raw_dataset.train_test_split(test_size=0.2, seed=42).values()
-val_dataset, test_dataset = temp_dataset.train_test_split(test_size=0.75, seed=42).values()
+val_dataset, test_dataset = temp_dataset.train_test_split(test_size=0.5, seed=42).values()
 
 dataset = DatasetDict({
     "train": train_dataset,
