@@ -46,6 +46,40 @@ class AnomalyDetector:
             torch.cuda.empty_cache()   # prevent accumulation
         return np.vstack(all_embs)
 
+    def _compute_reconstruction_error(self, seqs, batch_size=BATCH_SIZE):
+        self.model.eval()
+        losses = []
+        for i in tqdm(range(0, len(seqs), batch_size), desc="Computing reconstruction errors"):
+            batch = seqs[i:i + batch_size]
+            inputs = self.tokenizer(
+                batch,
+                return_tensors="pt",
+                truncation=True,
+                padding=True,
+                max_length=self.max_length
+            ).to(self.device)
+
+            with torch.no_grad():
+                outputs = self.model(**inputs, labels=inputs["input_ids"])
+                # Compute per-token loss
+                logits = outputs.logits
+                shift_logits = logits[:, :-1, :].contiguous()
+                shift_labels = inputs["input_ids"][:, 1:].contiguous()
+                # Cross-entropy loss per token
+                loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+                per_token_loss = loss_fct(
+                    shift_logits.view(-1, shift_logits.size(-1)),
+                    shift_labels.view(-1)
+                )
+                # Reshape back to [batch, seq_len]
+                per_token_loss = per_token_loss.view(shift_labels.size(0), -1)
+                # Mean loss per sequence
+                per_seq_loss = per_token_loss.mean(dim=1).detach().cpu().numpy()
+
+            losses.extend(per_seq_loss)
+            torch.cuda.empty_cache()
+        return np.array(losses)
+
     def detect(self):
         print("Loading data ...")
         dataset_builder = DatasetBuilder()
@@ -53,57 +87,68 @@ class AnomalyDetector:
         train_seqs, train_seqs_lbls = dataset_builder._group_sequences(train_pkts, train_lbls, train_tmstmp)
         test_pckts, test_lbls, test_tmstps = dataset_builder._load_packets(f"{self.data_path}/test.txt")
         test_seqs, test_seqs_lbls = dataset_builder._group_sequences(test_pckts, test_lbls, test_tmstps)
-
-        print("Encoding packets ...")
-        train_embeddings = self._get_embeddings_batch(train_seqs)
-        #train_y = np.array(train_seqs_lbls)
-
-        test_embeddings = self._get_embeddings_batch(test_seqs)
         test_y = np.array(test_seqs_lbls)
+        #print("\n", len(test_seqs), " ", len(test_y))
+        if False:
+            print("Encoding packets ...")
+            train_embeddings = self._get_embeddings_batch(train_seqs)
+            #train_y = np.array(train_seqs_lbls)
 
-        print("Normalizing embeddings ...")
-        scaler = StandardScaler().fit(train_embeddings)
-        emb_train_s = scaler.transform(train_embeddings)
-        emb_test_s = scaler.transform(test_embeddings)
+            test_embeddings = self._get_embeddings_batch(test_seqs)
+            test_y = np.array(test_seqs_lbls)
 
-        print("Dimensional reduction ...")
-        pca = PCA(n_components=PCA_DIM, random_state=42).fit(emb_train_s)
-        emb_train_reduced = pca.transform(emb_train_s)
-        emb_test_reduced = pca.transform(emb_test_s)
+            print("Normalizing embeddings ...")
+            scaler = StandardScaler().fit(train_embeddings)
+            emb_train_s = scaler.transform(train_embeddings)
+            emb_test_s = scaler.transform(test_embeddings)
 
-        # ---------- 1️⃣ Isolation Forest ----------
-        print("\n[IsolationForest] Training on normal sequences only...")
-        iso = IsolationForest(
-            n_estimators=300,
-            max_samples=0.8,
-            contamination="auto",   # contamination is the thershold for IF
-            max_features=0.8,
-            bootstrap=True,
-            random_state=42
-        ).fit(emb_train_reduced)
+            print("Dimensional reduction ...")
+            pca = PCA(n_components=PCA_DIM, random_state=42).fit(emb_train_s)
+            emb_train_reduced = pca.transform(emb_train_s)
+            emb_test_reduced = pca.transform(emb_test_s)
 
-        scores_iso = -iso.decision_function(emb_test_reduced)
-        preds_iso = np.where(iso.predict(emb_test_reduced) == 1, 0, 1)
-        auc_iso = roc_auc_score(test_y, scores_iso)
-        f1_iso = f1_score(test_y, preds_iso)
-        print(f"IsolationForest → AUC: {auc_iso:.3f}, F1: {f1_iso:.3f}")
+            # ---------- 1️⃣ Isolation Forest ----------
+            print("\n[IsolationForest] Training on normal sequences only...")
+            iso = IsolationForest(
+                n_estimators=500,
+                max_samples="auto",
+                contamination=0.05,   # contamination is the thershold for IF
+                max_features=1.0,
+                bootstrap=False,
+                random_state=42
+            ).fit(emb_train_reduced)
 
-        # ---------- 2️⃣ One-Class SVM ----------
-        print("\n[OneClassSVM] Training on normal sequences only...")
-        ocsvm = OneClassSVM(
-            kernel="rbf", 
-            gamma="scale", 
-            nu=0.05         # nu is the threshold for OCSVM
-        ).fit(emb_train_reduced)
-        scores_svm = -ocsvm.decision_function(emb_test_reduced)
-        preds_svm = np.where(ocsvm.predict(emb_test_reduced) == 1, 0, 1)
-        auc_svm = roc_auc_score(test_y, scores_svm)
-        f1_svm = f1_score(test_y, preds_svm)
-        print(f"OneClassSVM → AUC: {auc_svm:.3f}, F1: {f1_svm:.3f}")
+            scores_iso = -iso.decision_function(emb_test_reduced)
+            preds_iso = np.where(iso.predict(emb_test_reduced) == 1, 0, 1)
+            auc_iso = roc_auc_score(test_y, scores_iso)
+            f1_iso = f1_score(test_y, preds_iso)
+            print(f"IsolationForest → AUC: {auc_iso:.3f}, F1: {f1_iso:.3f}")
+
+            # ---------- 2️⃣ One-Class SVM ----------
+            print("\n[OneClassSVM] Training on normal sequences only...")
+            ocsvm = OneClassSVM(
+                kernel="rbf", 
+                gamma="scale", 
+                nu=0.03         # nu is the threshold for OCSVM
+            ).fit(emb_train_reduced)
+            scores_svm = -ocsvm.decision_function(emb_test_reduced)
+            preds_svm = np.where(ocsvm.predict(emb_test_reduced) == 1, 0, 1)
+            auc_svm = roc_auc_score(test_y, scores_svm)
+            f1_svm = f1_score(test_y, preds_svm)
+            print(f"OneClassSVM → AUC: {auc_svm:.3f}, F1: {f1_svm:.3f}")
+
+        # ---------- 3️⃣ Reconstruction Error ----------
+        print("\n[Reconstruction Error] Evaluating model reconstruction ability...")
+        recon_errors = self._compute_reconstruction_error(test_seqs)
+        # Compare with eval_loss threshold
+        preds_recon = np.where(recon_errors > self.eval_loss, 1, 0)  # 1 = anomaly
+        auc_recon = roc_auc_score(test_y, recon_errors)
+        f1_recon = f1_score(test_y, preds_recon)
+        print(f"ReconstructionError → AUC: {auc_recon:.3f}, F1: {f1_recon:.3f}")
 
         return {
-            "IsolationForest": (auc_iso, f1_iso),
-            "OneClassSVM": (auc_svm, f1_svm)
-            #"Reconstruction": (auc_recon, f1_recon),
+            #"IsolationForest": (auc_iso, f1_iso),
+            #"OneClassSVM": (auc_svm, f1_svm),
+            "Reconstruction": (auc_recon, f1_recon)
             #"Perplexity": (auc_perp, f1_perp),
         }
