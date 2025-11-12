@@ -6,8 +6,7 @@ from config import N_PACKETS, MAX_TIME_GAP, MAX_LENGTH, MODEL_NAME
 
 
 class DatasetBuilder:
-    def __init__(self, data_path):
-        self.data_path = data_path
+    def __init__(self):
         self.n_packets = N_PACKETS
         self.max_time_gap = MAX_TIME_GAP
         self.max_length = MAX_LENGTH

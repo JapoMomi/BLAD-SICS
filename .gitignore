@@ -1,15 +1,3 @@
-ByT5/ByT5-project/byt5_modbus_small/
+ByT5/ByT5-project-sequences/logs
 
-ByT5/ByT5-project/byt5_modbus_small_tuned/
-
-ByT5/ByT5-project-normalTraffic/byt5_modbus_encoder
-
-ByT5/ByT5-project-sequences/byt5_base_modbus_normalTraf_seq_3
-
-ByT5/ByT5-project-sequences/byt5_base_modbus_normalTraf_seq_4
-
-ByT5/ByT5-project-sequences/byt5_modbus_normalTraf_seq_3
-
-ByT5/ByT5-project-sequences/byt5_modbus_normalTraf_seq_4
-
-ByT5/ByT5-project-sequences/byt5_modbus_normalTraf_seq_5
+ByT5/ByT5-project-sequences/byt5_seq_4_normalTraffic

@@ -35,6 +35,6 @@ WANDB_DISABLED = True  # Disable Weights & Biases
 # --------------------
 # Detection Configuration
 # --------------------
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 LAST_N_LAYERS = 3
 PCA_DIM = 512          # compressed embedding size
