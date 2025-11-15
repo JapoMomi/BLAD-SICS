@@ -23,8 +23,8 @@ if __name__ == "__main__":
                 eval_loss = None         
     else:    
         # Step 1: Build dataset
-        builder = DatasetBuilder(data_path=DATA_PATH)
-        tokenized_datasets, raw_dataset, tokenizer = builder.build_dataset()
+        builder = DatasetBuilder()
+        tokenized_datasets, raw_dataset, tokenizer = builder.build_dataset(DATA_PATH)
 
         print(f"Dataset ready: {len(raw_dataset['train'])} train, "
             f"{len(raw_dataset['validation'])} val")

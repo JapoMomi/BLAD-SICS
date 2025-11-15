@@ -63,15 +63,15 @@ class DatasetBuilder:
         model_inputs["labels"] = labels["input_ids"]
         return model_inputs
 
-    def build_dataset(self):
+    def build_dataset(self, data_path):
         # Train dataset
-        train_pkts, train_lbls, train_tmstmp = self._load_packets(f"{self.data_path}/train.txt")
+        train_pkts, train_lbls, train_tmstmp = self._load_packets(f"{data_path}/train.txt")
         train_seq, train_seq_lbls = self._group_sequences(train_pkts, train_lbls, train_tmstmp)
         train_inputs = train_seq
         train_targets = train_seq
         train_dataset = Dataset.from_dict({"input": train_inputs, "target": train_targets})
         # Validation dataset
-        val_pkts, val_lbls, val_tmstmp = self._load_packets(f"{self.data_path}/validation.txt")
+        val_pkts, val_lbls, val_tmstmp = self._load_packets(f"{data_path}/validation.txt")
         val_seq, val_seq_lbls = self._group_sequences(val_pkts, val_lbls, val_tmstmp)
         val_inputs = val_seq
         val_targets = val_seq

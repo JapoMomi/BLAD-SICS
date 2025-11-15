@@ -88,7 +88,7 @@ class AnomalyDetector:
         test_pckts, test_lbls, test_tmstps = dataset_builder._load_packets(f"{self.data_path}/test.txt")
         test_seqs, test_seqs_lbls = dataset_builder._group_sequences(test_pckts, test_lbls, test_tmstps)
         test_y = np.array(test_seqs_lbls)
-        #print("\n", len(test_seqs), " ", len(test_y))
+        
         if False:
             print("Encoding packets ...")
             train_embeddings = self._get_embeddings_batch(train_seqs)
@@ -145,6 +145,25 @@ class AnomalyDetector:
         auc_recon = roc_auc_score(test_y, recon_errors)
         f1_recon = f1_score(test_y, preds_recon)
         print(f"ReconstructionError → AUC: {auc_recon:.3f}, F1: {f1_recon:.3f}")
+
+        # ---------- DEBUG ----------
+        # Separate normal and attack samples
+        normal_indices = np.where(test_y == 0)[0]
+        attack_indices = np.where(test_y == 1)[0]
+
+        normal_seqs = [test_seqs[i] for i in normal_indices]
+        attack_seqs = [test_seqs[i] for i in attack_indices]
+
+        print("\n[Reconstruction Error] Computing per-class reconstruction errors...")
+
+        # Compute reconstruction errors separately
+        normal_errors = self._compute_reconstruction_error(normal_seqs)
+        attack_errors = self._compute_reconstruction_error(attack_seqs)
+
+        # Optional: show summary statistics
+        print("\nSummary:")
+        print(f"Normal   → mean={normal_errors.mean():.4f}, std={normal_errors.std():.4f}")
+        print(f"Attack   → mean={attack_errors.mean():.4f}, std={attack_errors.std():.4f}")
 
         return {
             #"IsolationForest": (auc_iso, f1_iso),
