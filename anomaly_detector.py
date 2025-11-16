@@ -47,10 +47,18 @@ class AnomalyDetector:
         return np.vstack(all_embs)
 
     def _compute_reconstruction_error(self, seqs, batch_size=BATCH_SIZE):
+        """
+        Returns:
+            recon_texts: list[str] reconstructed sequences
+            errors: np.ndarray reconstruction errors
+        """
         self.model.eval()
-        losses = []
-        for i in tqdm(range(0, len(seqs), batch_size), desc="Computing reconstruction errors"):
+        recon_texts = []
+        errors = []
+
+        for i in tqdm(range(0, len(seqs), batch_size), desc="Reconstructing sequences"):
             batch = seqs[i:i + batch_size]
+
             inputs = self.tokenizer(
                 batch,
                 return_tensors="pt",
@@ -60,25 +68,54 @@ class AnomalyDetector:
             ).to(self.device)
 
             with torch.no_grad():
+
+                # 1️⃣ Generate reconstruction (text output)
+                generated = self.model.generate(
+                    **inputs,
+                    max_length=self.max_length,
+                    num_beams=1,
+                    do_sample=False
+                )
+                decoded = self.tokenizer.batch_decode(generated, skip_special_tokens=True)
+                recon_texts.extend(decoded)
+
+                # 2️⃣ Compute reconstruction error
                 outputs = self.model(**inputs, labels=inputs["input_ids"])
-                # Compute per-token loss
                 logits = outputs.logits
                 shift_logits = logits[:, :-1, :].contiguous()
                 shift_labels = inputs["input_ids"][:, 1:].contiguous()
-                # Cross-entropy loss per token
+
                 loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
                 per_token_loss = loss_fct(
                     shift_logits.view(-1, shift_logits.size(-1)),
                     shift_labels.view(-1)
                 )
-                # Reshape back to [batch, seq_len]
                 per_token_loss = per_token_loss.view(shift_labels.size(0), -1)
-                # Mean loss per sequence
                 per_seq_loss = per_token_loss.mean(dim=1).detach().cpu().numpy()
 
-            losses.extend(per_seq_loss)
+                errors.extend(per_seq_loss)
+
             torch.cuda.empty_cache()
-        return np.array(losses)
+
+        return recon_texts, np.array(errors)
+
+    def save_reconstruction_report(self, seqs, labels, filename):
+        """
+        Save original, reconstructed, label, predicted anomaly, and reconstruction error.
+        """
+        print(f"\nSaving reconstruction report to {filename} ...")
+
+        recon_texts, recon_errors = self._compute_reconstruction_error(seqs)
+        preds = (recon_errors > self.eval_loss).astype(int)  # 1 = anomaly
+
+        with open(filename, "w", newline='', encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Original", "Reconstructed", "Label", "Predicted", "Error"])
+
+            for orig, recon, y, pred, err in zip(seqs, recon_texts, labels, preds, recon_errors):
+                writer.writerow([orig, recon, y, pred, f"{err:.6f}"])
+
+        print(f"Report saved: {filename}")
 
     def detect(self):
         print("Loading data ...")
@@ -137,37 +174,44 @@ class AnomalyDetector:
             f1_svm = f1_score(test_y, preds_svm)
             print(f"OneClassSVM → AUC: {auc_svm:.3f}, F1: {f1_svm:.3f}")
 
-        # ---------- 3️⃣ Reconstruction Error ----------
-        print("\n[Reconstruction Error] Evaluating model reconstruction ability...")
-        recon_errors = self._compute_reconstruction_error(test_seqs)
-        # Compare with eval_loss threshold
-        preds_recon = np.where(recon_errors > self.eval_loss, 1, 0)  # 1 = anomaly
-        auc_recon = roc_auc_score(test_y, recon_errors)
-        f1_recon = f1_score(test_y, preds_recon)
-        print(f"ReconstructionError → AUC: {auc_recon:.3f}, F1: {f1_recon:.3f}")
+            # ---------- 3️⃣ Reconstruction Error ----------
+            print("\n[Reconstruction Error] Evaluating model reconstruction ability...")
+            recon_errors = self._compute_reconstruction_error(test_seqs)
+            # Compare with eval_loss threshold
+            preds_recon = np.where(recon_errors > self.eval_loss, 1, 0)  # 1 = anomaly
+            auc_recon = roc_auc_score(test_y, recon_errors)
+            f1_recon = f1_score(test_y, preds_recon)
+            print(f"ReconstructionError → AUC: {auc_recon:.3f}, F1: {f1_recon:.3f}")
 
-        # ---------- DEBUG ----------
-        # Separate normal and attack samples
-        normal_indices = np.where(test_y == 0)[0]
-        attack_indices = np.where(test_y == 1)[0]
+            # ---------- DEBUG ----------
+            # Separate normal and attack samples
+            normal_indices = np.where(test_y == 0)[0]
+            attack_indices = np.where(test_y == 1)[0]
 
-        normal_seqs = [test_seqs[i] for i in normal_indices]
-        attack_seqs = [test_seqs[i] for i in attack_indices]
+            normal_seqs = [test_seqs[i] for i in normal_indices]
+            attack_seqs = [test_seqs[i] for i in attack_indices]
 
-        print("\n[Reconstruction Error] Computing per-class reconstruction errors...")
+            print("\n[Reconstruction Error] Computing per-class reconstruction errors...")
 
-        # Compute reconstruction errors separately
-        normal_errors = self._compute_reconstruction_error(normal_seqs)
-        attack_errors = self._compute_reconstruction_error(attack_seqs)
+            # Compute reconstruction errors separately
+            normal_errors = self._compute_reconstruction_error(normal_seqs)
+            attack_errors = self._compute_reconstruction_error(attack_seqs)
 
-        # Optional: show summary statistics
-        print("\nSummary:")
-        print(f"Normal   → mean={normal_errors.mean():.4f}, std={normal_errors.std():.4f}")
-        print(f"Attack   → mean={attack_errors.mean():.4f}, std={attack_errors.std():.4f}")
+            # Optional: show summary statistics
+            print("\nSummary:")
+            print(f"Normal   → mean={normal_errors.mean():.4f}, std={normal_errors.std():.4f}")
+            print(f"Attack   → mean={attack_errors.mean():.4f}, std={attack_errors.std():.4f}")
+
+                # ---------- SAVE FULL RECONSTRUCTION REPORT ----------
+        self.save_reconstruction_report(
+            test_seqs,
+            test_y,
+            filename=f"{self.data_path}/full_reconstruction_report.csv"
+        )
 
         return {
             #"IsolationForest": (auc_iso, f1_iso),
             #"OneClassSVM": (auc_svm, f1_svm),
-            "Reconstruction": (auc_recon, f1_recon)
+            #"Reconstruction": (auc_recon, f1_recon)
             #"Perplexity": (auc_perp, f1_perp),
         }
