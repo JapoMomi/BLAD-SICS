@@ -3,8 +3,8 @@
 # --------------------
 DATA_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits"
 
-N_PACKETS = 3           # Number of packets per sequence
-MAX_TIME_GAP = 2        # Seconds between packets
+N_PACKETS = 5           # Number of packets per sequence
+#MAX_TIME_GAP = 2        # Seconds between packets
 MAX_LENGTH = 768        # Tokenizer sequence length limit
 
 # --------------------
@@ -36,5 +36,5 @@ WANDB_DISABLED = True  # Disable Weights & Biases
 # Detection Configuration
 # --------------------
 BATCH_SIZE = 32
-LAST_N_LAYERS = 3
-PCA_DIM = 512          # compressed embedding size
+LAST_N_LAYERS = 1
+PCA_DIM = 128          # compressed embedding size

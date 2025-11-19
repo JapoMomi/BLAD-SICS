@@ -41,7 +41,9 @@ test_normal_rows = normal_rows[n_train+n_val:]
 # -----------------------
 # Step 3: Balance attack rows for test set
 # -----------------------
-n_test_attack = min(len(attack_rows), len(test_normal_rows))
+#n_test_attack = min(len(attack_rows), len(test_normal_rows))
+max_attack_allowed = int(n_test_normal * 0.1)
+n_test_attack = min(len(attack_rows), max_attack_allowed)
 test_attack_rows = random.sample(attack_rows, n_test_attack)
 
 # Combine normal + attack for test and shuffle

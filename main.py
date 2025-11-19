@@ -42,17 +42,11 @@ if __name__ == "__main__":
         eval_loss = trainer.train()
         print(f"\n✅ Training complete! Eval loss = {eval_loss}")
 
-        # Step 3: Save eval_loss to file
-        with open(eval_loss_file, "w") as f:
-            f.write(f"eval_loss = {eval_loss}\n")
-        print(f"💾 Eval loss saved to: {eval_loss_file}")
-
     # Step 3: Anomaly detection phase
     print("\n🚨 Starting anomaly detection phase ...")
     detector = AnomalyDetector(
         model_dir=f"{OUTPUT_DIR}/byt5_seq_{N_PACKETS}_normalTraffic_final",
         data_path=DATA_PATH,
-        eval_loss=eval_loss
     )
 
     results = detector.detect()

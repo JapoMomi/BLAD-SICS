@@ -14,10 +14,9 @@ from config import MAX_LENGTH, BATCH_SIZE, LAST_N_LAYERS, PCA_DIM
 
 
 class AnomalyDetector:
-    def __init__(self, model_dir, data_path, eval_loss, max_length=MAX_LENGTH):
+    def __init__(self, model_dir, data_path, max_length=MAX_LENGTH):
         self.model_dir = model_dir
         self.data_path = data_path
-        self.eval_loss = eval_loss
         self.max_length = max_length
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -47,11 +46,6 @@ class AnomalyDetector:
         return np.vstack(all_embs)
 
     def _compute_reconstruction_error(self, seqs, batch_size=BATCH_SIZE):
-        """
-        Returns:
-            recon_texts: list[str] reconstructed sequences
-            errors: np.ndarray reconstruction errors
-        """
         self.model.eval()
         recon_texts = []
         errors = []
@@ -59,6 +53,7 @@ class AnomalyDetector:
         for i in tqdm(range(0, len(seqs), batch_size), desc="Reconstructing sequences"):
             batch = seqs[i:i + batch_size]
 
+            # Tokenize input batch
             inputs = self.tokenizer(
                 batch,
                 return_tensors="pt",
@@ -68,7 +63,6 @@ class AnomalyDetector:
             ).to(self.device)
 
             with torch.no_grad():
-
                 # 1️⃣ Generate reconstruction (text output)
                 generated = self.model.generate(
                     **inputs,
@@ -79,34 +73,41 @@ class AnomalyDetector:
                 decoded = self.tokenizer.batch_decode(generated, skip_special_tokens=True)
                 recon_texts.extend(decoded)
 
-                # 2️⃣ Compute reconstruction error
-                outputs = self.model(**inputs, labels=inputs["input_ids"])
-                logits = outputs.logits
-                shift_logits = logits[:, :-1, :].contiguous()
-                shift_labels = inputs["input_ids"][:, 1:].contiguous()
+                # 2️⃣ Compute reconstruction error (MSE)
+                # Encode original inputs
+                orig_outputs = self.model.encoder(**inputs)
+                orig_embeds = orig_outputs.last_hidden_state  # [batch, seq_len, hidden_dim]
 
-                loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
-                per_token_loss = loss_fct(
-                    shift_logits.view(-1, shift_logits.size(-1)),
-                    shift_labels.view(-1)
-                )
-                per_token_loss = per_token_loss.view(shift_labels.size(0), -1)
-                per_seq_loss = per_token_loss.mean(dim=1).detach().cpu().numpy()
+                # Encode reconstructed inputs
+                recon_inputs = self.tokenizer(
+                    decoded,
+                    return_tensors="pt",
+                    truncation=True,
+                    padding=True,
+                    max_length=self.max_length
+                ).to(self.device)
 
-                errors.extend(per_seq_loss)
+                recon_outputs = self.model.encoder(**recon_inputs)
+                recon_embeds = recon_outputs.last_hidden_state  # [batch, seq_len, hidden_dim]
+
+                # Align sequence lengths (pad/truncate to same length)
+                min_len = min(orig_embeds.size(1), recon_embeds.size(1))
+                orig_embeds = orig_embeds[:, :min_len, :]
+                recon_embeds = recon_embeds[:, :min_len, :]
+
+                # Compute per-sequence MSE
+                mse = torch.mean((orig_embeds - recon_embeds) ** 2, dim=(1, 2))  # [batch]
+                errors.extend(mse.detach().cpu().numpy())
 
             torch.cuda.empty_cache()
 
         return recon_texts, np.array(errors)
 
-    def save_reconstruction_report(self, seqs, labels, filename):
-        """
-        Save original, reconstructed, label, predicted anomaly, and reconstruction error.
-        """
+
+    def save_reconstruction_report(self, threshold, seqs, labels, recon_texts, recon_errors, filename):
         print(f"\nSaving reconstruction report to {filename} ...")
 
-        recon_texts, recon_errors = self._compute_reconstruction_error(seqs)
-        preds = (recon_errors > self.eval_loss).astype(int)  # 1 = anomaly
+        preds = (recon_errors > threshold).astype(int)  # 1 = anomaly
 
         with open(filename, "w", newline='', encoding="utf-8") as f:
             writer = csv.writer(f)
@@ -122,11 +123,13 @@ class AnomalyDetector:
         dataset_builder = DatasetBuilder()
         train_pkts, train_lbls, train_tmstmp = dataset_builder._load_packets(data_path=f"{self.data_path}/train.txt")
         train_seqs, train_seqs_lbls = dataset_builder._group_sequences(train_pkts, train_lbls, train_tmstmp)
+        val_pkts, val_lbls, val_tmstmp = dataset_builder._load_packets(data_path=f"{self.data_path}/validation.txt")
+        val_seqs, val_seqs_lbls = dataset_builder._group_sequences(val_pkts, val_lbls, val_tmstmp)
         test_pckts, test_lbls, test_tmstps = dataset_builder._load_packets(f"{self.data_path}/test.txt")
         test_seqs, test_seqs_lbls = dataset_builder._group_sequences(test_pckts, test_lbls, test_tmstps)
         test_y = np.array(test_seqs_lbls)
         
-        if False:
+        if True:
             print("Encoding packets ...")
             train_embeddings = self._get_embeddings_batch(train_seqs)
             #train_y = np.array(train_seqs_lbls)
@@ -147,11 +150,11 @@ class AnomalyDetector:
             # ---------- 1️⃣ Isolation Forest ----------
             print("\n[IsolationForest] Training on normal sequences only...")
             iso = IsolationForest(
-                n_estimators=500,
-                max_samples="auto",
-                contamination=0.05,   # contamination is the thershold for IF
-                max_features=1.0,
-                bootstrap=False,
+                n_estimators=300,
+                max_samples=0.8,
+                contamination=0.1,
+                max_features=0.8,
+                bootstrap=True,
                 random_state=42
             ).fit(emb_train_reduced)
 
@@ -166,52 +169,39 @@ class AnomalyDetector:
             ocsvm = OneClassSVM(
                 kernel="rbf", 
                 gamma="scale", 
-                nu=0.03         # nu is the threshold for OCSVM
+                nu=0.1         # nu is the threshold for OCSVM
             ).fit(emb_train_reduced)
+             
             scores_svm = -ocsvm.decision_function(emb_test_reduced)
             preds_svm = np.where(ocsvm.predict(emb_test_reduced) == 1, 0, 1)
             auc_svm = roc_auc_score(test_y, scores_svm)
             f1_svm = f1_score(test_y, preds_svm)
             print(f"OneClassSVM → AUC: {auc_svm:.3f}, F1: {f1_svm:.3f}")
 
+        if True:
             # ---------- 3️⃣ Reconstruction Error ----------
             print("\n[Reconstruction Error] Evaluating model reconstruction ability...")
-            recon_errors = self._compute_reconstruction_error(test_seqs)
+            val_recon_text, val_recon_errors = self._compute_reconstruction_error(val_seqs)
+            threshold = val_recon_errors.mean() + 3*val_recon_errors.std()
+            test_recon_text, test_recon_errors = self._compute_reconstruction_error(test_seqs)
             # Compare with eval_loss threshold
-            preds_recon = np.where(recon_errors > self.eval_loss, 1, 0)  # 1 = anomaly
-            auc_recon = roc_auc_score(test_y, recon_errors)
+            preds_recon = np.where(test_recon_errors > threshold, 1, 0)  # 1 = anomaly
+            auc_recon = roc_auc_score(test_y, test_recon_errors)
             f1_recon = f1_score(test_y, preds_recon)
             print(f"ReconstructionError → AUC: {auc_recon:.3f}, F1: {f1_recon:.3f}")
 
-            # ---------- DEBUG ----------
-            # Separate normal and attack samples
-            normal_indices = np.where(test_y == 0)[0]
-            attack_indices = np.where(test_y == 1)[0]
-
-            normal_seqs = [test_seqs[i] for i in normal_indices]
-            attack_seqs = [test_seqs[i] for i in attack_indices]
-
-            print("\n[Reconstruction Error] Computing per-class reconstruction errors...")
-
-            # Compute reconstruction errors separately
-            normal_errors = self._compute_reconstruction_error(normal_seqs)
-            attack_errors = self._compute_reconstruction_error(attack_seqs)
-
-            # Optional: show summary statistics
-            print("\nSummary:")
-            print(f"Normal   → mean={normal_errors.mean():.4f}, std={normal_errors.std():.4f}")
-            print(f"Attack   → mean={attack_errors.mean():.4f}, std={attack_errors.std():.4f}")
-
-                # ---------- SAVE FULL RECONSTRUCTION REPORT ----------
-        self.save_reconstruction_report(
-            test_seqs,
-            test_y,
-            filename=f"{self.data_path}/full_reconstruction_report.csv"
-        )
+            # ---------- SAVE FULL RECONSTRUCTION REPORT ----------
+            self.save_reconstruction_report(
+                threshold,
+                test_seqs,
+                test_y,
+                test_recon_text,
+                test_recon_errors,
+                filename=f"{self.data_path}/full_reconstruction_report.csv"
+            )
 
         return {
-            #"IsolationForest": (auc_iso, f1_iso),
-            #"OneClassSVM": (auc_svm, f1_svm),
-            #"Reconstruction": (auc_recon, f1_recon)
-            #"Perplexity": (auc_perp, f1_perp),
+            "IsolationForest": (auc_iso, f1_iso),
+            "OneClassSVM": (auc_svm, f1_svm),
+            "Reconstruction": (auc_recon, f1_recon)
         }

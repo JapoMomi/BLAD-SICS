@@ -2,13 +2,13 @@ import csv
 from datasets import Dataset, DatasetDict
 from transformers import AutoTokenizer
 
-from config import N_PACKETS, MAX_TIME_GAP, MAX_LENGTH, MODEL_NAME
+from config import N_PACKETS, MAX_LENGTH, MODEL_NAME
 
 
 class DatasetBuilder:
     def __init__(self):
         self.n_packets = N_PACKETS
-        self.max_time_gap = MAX_TIME_GAP
+        #self.max_time_gap = MAX_TIME_GAP
         self.max_length = MAX_LENGTH
         self.model_name = MODEL_NAME
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -37,15 +37,15 @@ class DatasetBuilder:
         while start < len(packets):
             seq = [packets[start]]
             seq_lbls = [labels[start]]
-            current_ts = timestamps[start]
+            #current_ts = timestamps[start]
             for j in range(start + 1, len(packets)):
                 if len(seq) >= self.n_packets:
                     break
-                if timestamps[j] - current_ts > self.max_time_gap:
-                    break
+                #if timestamps[j] - current_ts > self.max_time_gap:
+                #    break
                 seq.append(packets[j])
                 seq_lbls.append(labels[j])
-                current_ts = timestamps[j]
+                #current_ts = timestamps[j]
             seq_text = "     ".join(seq)
             seq_label = 1 if any(l != 0 for l in seq_lbls) else 0
             sequences.append(seq_text)
