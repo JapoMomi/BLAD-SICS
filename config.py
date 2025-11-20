@@ -3,9 +3,9 @@
 # --------------------
 DATA_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits"
 
-N_PACKETS = 5           # Number of packets per sequence
+N_PACKETS = 1           # Number of packets per sequence
 #MAX_TIME_GAP = 2        # Seconds between packets
-MAX_LENGTH = 768        # Tokenizer sequence length limit
+MAX_LENGTH = 368        # Tokenizer sequence length limit
 
 # --------------------
 # Model Configuration

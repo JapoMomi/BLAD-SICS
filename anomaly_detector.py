@@ -35,14 +35,20 @@ class AnomalyDetector:
 
             with torch.no_grad():
                 outputs = self.encoder(**inputs, output_hidden_states=True)
-                # take last n layers and average across them and tokens
+                # Take last n layers
                 hidden_states = outputs.hidden_states[-last_n_layers:]
-                hidden_mean = torch.stack(hidden_states).mean(0).mean(1)
+                # Stack layers: [n_layers, batch, seq_len, hidden_dim]
+                stacked_layers = torch.stack(hidden_states)
+                # Average across the *layers* first (this is fine)
+                # Shape becomes: [batch, seq_len, hidden_dim]
+                layer_averaged = stacked_layers.mean(dim=0)
+                hidden_mean = layer_averaged.mean(dim=1)
                 hidden_mean = hidden_mean.cpu().numpy()
-                del outputs, hidden_states # free space
-
+                del outputs, hidden_states
+            
             all_embs.append(hidden_mean)
-            torch.cuda.empty_cache()   # prevent accumulation
+            torch.cuda.empty_cache() 
+            
         return np.vstack(all_embs)
 
     def _compute_reconstruction_error(self, seqs, batch_size=BATCH_SIZE):
@@ -106,25 +112,25 @@ class AnomalyDetector:
 
     def save_reconstruction_report(self, threshold, seqs, labels, recon_texts, recon_errors, filename):
         print(f"\nSaving reconstruction report to {filename} ...")
-
         preds = (recon_errors > threshold).astype(int)  # 1 = anomaly
-
         with open(filename, "w", newline='', encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["Original", "Reconstructed", "Label", "Predicted", "Error"])
 
             for orig, recon, y, pred, err in zip(seqs, recon_texts, labels, preds, recon_errors):
-                writer.writerow([orig, recon, y, pred, f"{err:.6f}"])
-
+                writer.writerow([orig, recon, y, pred, f"{err:.9f}"])
         print(f"Report saved: {filename}")
 
     def detect(self):
         print("Loading data ...")
         dataset_builder = DatasetBuilder()
+        # Train
         train_pkts, train_lbls, train_tmstmp = dataset_builder._load_packets(data_path=f"{self.data_path}/train.txt")
         train_seqs, train_seqs_lbls = dataset_builder._group_sequences(train_pkts, train_lbls, train_tmstmp)
+        # Validation
         val_pkts, val_lbls, val_tmstmp = dataset_builder._load_packets(data_path=f"{self.data_path}/validation.txt")
         val_seqs, val_seqs_lbls = dataset_builder._group_sequences(val_pkts, val_lbls, val_tmstmp)
+        # Test
         test_pckts, test_lbls, test_tmstps = dataset_builder._load_packets(f"{self.data_path}/test.txt")
         test_seqs, test_seqs_lbls = dataset_builder._group_sequences(test_pckts, test_lbls, test_tmstps)
         test_y = np.array(test_seqs_lbls)
@@ -133,33 +139,42 @@ class AnomalyDetector:
             print("Encoding packets ...")
             train_embeddings = self._get_embeddings_batch(train_seqs)
             #train_y = np.array(train_seqs_lbls)
-
+            val_embeddings = self._get_embeddings_batch(val_seqs)
             test_embeddings = self._get_embeddings_batch(test_seqs)
             test_y = np.array(test_seqs_lbls)
 
-            print("Normalizing embeddings ...")
-            scaler = StandardScaler().fit(train_embeddings)
-            emb_train_s = scaler.transform(train_embeddings)
-            emb_test_s = scaler.transform(test_embeddings)
+            #print("Normalizing embeddings ...")
+            #scaler = StandardScaler().fit(train_embeddings)
+            #emb_train_s = scaler.transform(train_embeddings)
+            #emb_val_s = scaler.transform(val_embeddings)
+            #emb_test_s = scaler.transform(test_embeddings)
 
-            print("Dimensional reduction ...")
-            pca = PCA(n_components=PCA_DIM, random_state=42).fit(emb_train_s)
-            emb_train_reduced = pca.transform(emb_train_s)
-            emb_test_reduced = pca.transform(emb_test_s)
+            #print("Dimensional reduction ...")
+            #pca = PCA(n_components=PCA_DIM, random_state=42).fit(train_embeddings)
+            #emb_train_reduced = pca.transform(train_embeddings)
+            #emb_val_reduced = pca.transform(val_embeddings)
+            #emb_test_reduced = pca.transform(test_embeddings)
 
             # ---------- 1️⃣ Isolation Forest ----------
             print("\n[IsolationForest] Training on normal sequences only...")
+            # 1. Fit on Train
             iso = IsolationForest(
                 n_estimators=300,
                 max_samples=0.8,
-                contamination=0.1,
-                max_features=0.8,
+                contamination="auto",
+                max_features=1,
                 bootstrap=True,
                 random_state=42
-            ).fit(emb_train_reduced)
-
-            scores_iso = -iso.decision_function(emb_test_reduced)
-            preds_iso = np.where(iso.predict(emb_test_reduced) == 1, 0, 1)
+            ).fit(train_embeddings)
+            # 2. Get scores for Validation (Normal)
+            # Sklearn returns negative scores (higher = normal), so we invert them
+            val_scores = -iso.decision_function(val_embeddings)
+            # 3. Set Threshold (e.g., 99th percentile of benign validation data)
+            # This aligns with the paper's method 
+            threshold = np.percentile(val_scores, 99)
+            # 4. Detect on Test
+            scores_iso = -iso.decision_function(test_embeddings)
+            preds_iso = (scores_iso > threshold).astype(int)
             auc_iso = roc_auc_score(test_y, scores_iso)
             f1_iso = f1_score(test_y, preds_iso)
             print(f"IsolationForest → AUC: {auc_iso:.3f}, F1: {f1_iso:.3f}")
@@ -168,12 +183,12 @@ class AnomalyDetector:
             print("\n[OneClassSVM] Training on normal sequences only...")
             ocsvm = OneClassSVM(
                 kernel="rbf", 
-                gamma="scale", 
-                nu=0.1         # nu is the threshold for OCSVM
-            ).fit(emb_train_reduced)
+                gamma="auto", 
+                nu=0.01    # Allow only ~1% false positives on train data      
+            ).fit(train_embeddings)
              
-            scores_svm = -ocsvm.decision_function(emb_test_reduced)
-            preds_svm = np.where(ocsvm.predict(emb_test_reduced) == 1, 0, 1)
+            scores_svm = -ocsvm.decision_function(test_embeddings)
+            preds_svm = np.where(ocsvm.predict(test_embeddings) == 1, 0, 1)
             auc_svm = roc_auc_score(test_y, scores_svm)
             f1_svm = f1_score(test_y, preds_svm)
             print(f"OneClassSVM → AUC: {auc_svm:.3f}, F1: {f1_svm:.3f}")
@@ -197,7 +212,7 @@ class AnomalyDetector:
                 test_y,
                 test_recon_text,
                 test_recon_errors,
-                filename=f"{self.data_path}/full_reconstruction_report.csv"
+                filename="full_reconstruction_report.csv"
             )
 
         return {

@@ -10,17 +10,8 @@ if __name__ == "__main__":
     model_dir = os.path.join(OUTPUT_DIR, f"byt5_seq_{N_PACKETS}_normalTraffic_final")
     eval_loss_file = os.path.join(OUTPUT_DIR, f"byt5_seq_{N_PACKETS}_normalTraffic_final_EvalLoss.txt")
 
-    if os.path.exists(model_dir) and os.path.exists(eval_loss_file):
-        print(f"\nModel already exists at {model_dir}. Skipping training...")
-        # Load eval_loss from file
-        with open(eval_loss_file, "r") as f:
-            line = f.readline().strip()
-            try:
-                eval_loss = float(line.split("=")[-1].strip())
-                print(f"Loaded eval_loss = {eval_loss}")
-            except ValueError:
-                print("⚠️ Warning: could not parse eval_loss file, setting to None.")
-                eval_loss = None         
+    if os.path.exists(model_dir):
+        print(f"\nModel already exists at {model_dir}. Skipping training...")         
     else:    
         # Step 1: Build dataset
         builder = DatasetBuilder()
