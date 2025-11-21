@@ -14,9 +14,17 @@ from config import MAX_LENGTH, BATCH_SIZE, LAST_N_LAYERS, PCA_DIM
 
 
 class AnomalyDetector:
-    def __init__(self, model_dir, data_path, max_length=MAX_LENGTH):
+    def __init__(self, model_dir, tokenized_datasets, raw_dataset, max_length=MAX_LENGTH):
+        """
+        Args:
+            model_dir: Path to the saved model.
+            tokenized_datasets: The dictionary of tokenized datasets (from main.py).
+            raw_dataset: The dictionary of raw datasets containing text and labels (from main.py).
+            max_length: Maximum sequence length.
+        """
         self.model_dir = model_dir
-        self.data_path = data_path
+        #self.tokenized_datasets = tokenized_datasets
+        self.raw_dataset = raw_dataset
         self.max_length = max_length
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -109,7 +117,6 @@ class AnomalyDetector:
 
         return recon_texts, np.array(errors)
 
-
     def save_reconstruction_report(self, threshold, seqs, labels, recon_texts, recon_errors, filename):
         print(f"\nSaving reconstruction report to {filename} ...")
         preds = (recon_errors > threshold).astype(int)  # 1 = anomaly
@@ -123,17 +130,14 @@ class AnomalyDetector:
 
     def detect(self):
         print("Loading data ...")
-        dataset_builder = DatasetBuilder()
-        # Train
-        train_pkts, train_lbls, train_tmstmp = dataset_builder._load_packets(data_path=f"{self.data_path}/train.txt")
-        train_seqs, train_seqs_lbls = dataset_builder._group_sequences(train_pkts, train_lbls, train_tmstmp)
-        # Validation
-        val_pkts, val_lbls, val_tmstmp = dataset_builder._load_packets(data_path=f"{self.data_path}/validation.txt")
-        val_seqs, val_seqs_lbls = dataset_builder._group_sequences(val_pkts, val_lbls, val_tmstmp)
-        # Test
-        test_pckts, test_lbls, test_tmstps = dataset_builder._load_packets(f"{self.data_path}/test.txt")
-        test_seqs, test_seqs_lbls = dataset_builder._group_sequences(test_pckts, test_lbls, test_tmstps)
-        test_y = np.array(test_seqs_lbls)
+        # Train (Normal/Benign traffic)
+        train_seqs = self.raw_dataset['train']['input']
+        # train_y = self.raw_dataset['train']['target'] # Only needed if labels exist
+        # Validation (Normal/Benign traffic)
+        val_seqs = self.raw_dataset['validation']['input']
+        # Test (Mixed traffic)
+        test_seqs = self.raw_dataset['test']['input']
+        test_y = np.array(self.raw_dataset['test']['target'])
         
         if False:
             print("Encoding packets ...")

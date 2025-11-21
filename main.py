@@ -38,7 +38,8 @@ if __name__ == "__main__":
     print("\n🚨 Starting anomaly detection phase ...")
     detector = AnomalyDetector(
         model_dir=f"{OUTPUT_DIR}/byt5_seq_{N_PACKETS}_normalTraffic_final",
-        data_path=DATA_PATH,
+        tokenized_datasets=tokenized_datasets,
+        raw_dataset=raw_dataset
     )
 
     results = detector.detect()
