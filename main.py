@@ -8,18 +8,19 @@ from config import DATA_PATH, OUTPUT_DIR, LOGS_DIR, MODEL_NAME, N_PACKETS
 
 if __name__ == "__main__":
     model_dir = os.path.join(OUTPUT_DIR, f"byt5_seq_{N_PACKETS}_normalTraffic_final")
-    eval_loss_file = os.path.join(OUTPUT_DIR, f"byt5_seq_{N_PACKETS}_normalTraffic_final_EvalLoss.txt")
+    #eval_loss_file = os.path.join(OUTPUT_DIR, f"byt5_seq_{N_PACKETS}_normalTraffic_final_EvalLoss.txt")
+
+    # Step 1: Build dataset
+    builder = DatasetBuilder()
+    tokenized_datasets, raw_dataset, tokenizer = builder.build_dataset(DATA_PATH)
+
+    print(f"Dataset ready: {len(raw_dataset['train'])} train, "
+        f"{len(raw_dataset['validation'])} val,"
+        f"{len(raw_dataset['test'])} test,")
 
     if os.path.exists(model_dir):
         print(f"\nModel already exists at {model_dir}. Skipping training...")         
     else:    
-        # Step 1: Build dataset
-        builder = DatasetBuilder()
-        tokenized_datasets, raw_dataset, tokenizer = builder.build_dataset(DATA_PATH)
-
-        print(f"Dataset ready: {len(raw_dataset['train'])} train, "
-            f"{len(raw_dataset['validation'])} val")
-
         # Step 2: Train ByT5 model
         trainer = ByT5Trainer(
             model_name=MODEL_NAME,

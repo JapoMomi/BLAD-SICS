@@ -39,7 +39,7 @@ class AnomalyDetector:
                 hidden_states = outputs.hidden_states[-last_n_layers:]
                 # Stack layers: [n_layers, batch, seq_len, hidden_dim]
                 stacked_layers = torch.stack(hidden_states)
-                # Average across the *layers* first (this is fine)
+                # Average across the *layers* first
                 # Shape becomes: [batch, seq_len, hidden_dim]
                 layer_averaged = stacked_layers.mean(dim=0)
                 hidden_mean = layer_averaged.mean(dim=1)
@@ -135,7 +135,7 @@ class AnomalyDetector:
         test_seqs, test_seqs_lbls = dataset_builder._group_sequences(test_pckts, test_lbls, test_tmstps)
         test_y = np.array(test_seqs_lbls)
         
-        if True:
+        if False:
             print("Encoding packets ...")
             train_embeddings = self._get_embeddings_batch(train_seqs)
             #train_y = np.array(train_seqs_lbls)
@@ -216,7 +216,7 @@ class AnomalyDetector:
             )
 
         return {
-            "IsolationForest": (auc_iso, f1_iso),
-            "OneClassSVM": (auc_svm, f1_svm),
+            #"IsolationForest": (auc_iso, f1_iso),
+            #"OneClassSVM": (auc_svm, f1_svm),
             "Reconstruction": (auc_recon, f1_recon)
         }
