@@ -64,7 +64,12 @@ class ModbusDataset(Dataset):
 
     def __getitem__(self, idx):
         text = self.texts[idx]
-        encoding = self.tokenizer(text, max_length=self.max_length, padding="max_length", truncation=True, return_tensors="pt")
+        encoding = self.tokenizer(
+            text, 
+            max_length=self.max_length,
+            padding="max_length",  # Adds the [PAD] tokens to reach max_length
+            truncation=True, 
+            return_tensors="pt")
         input_ids = encoding.input_ids.squeeze()
         attention_mask = encoding.attention_mask.squeeze()
         labels = input_ids.clone()
@@ -87,14 +92,19 @@ def get_losses(model, dataset, device):
     with torch.no_grad():
         for batch in dataloader:
             input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
+            # binary "filter" that tells the model which parts of the input are real data and which parts are just empty padding
+            attention_mask = batch['attention_mask'].to(device) 
             labels = batch['labels'].to(device)
 
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+            outputs = model(
+                input_ids=input_ids, 
+                attention_mask=attention_mask, 
+                labels=labels)
+            # (raw prediction scores) -> Logits: predict the NEXT token
             logits = outputs.logits
 
-            # Shift logits and labels for T5 (Next Token Prediction nature)
-            # Logits: predict the NEXT token
+            # To correctly calculate the error, we shift the logits one step forward and
+            # the labels one step back so that the prediction for token t is compared against the true token t+1
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
 
@@ -146,7 +156,7 @@ if __name__ == "__main__":
     # E. Determine Threshold
     # Strategy: Threshold is the value where 99% of validation data is included.
     # Anything higher than this is an anomaly.
-    threshold = np.percentile(val_losses, 90) 
+    threshold = np.percentile(val_losses, 99) 
     print(f"\n--- Results ---")
     print(f"Calculated Threshold (99th percentile of Val): {threshold:.6f}")
 
