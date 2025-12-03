@@ -13,11 +13,11 @@ print("DONE. Imports are fine.")
 
 # --- 1. Setup & Paths ---
 # Use the path where you just saved the model
-MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/final_modbus_autoencoder"
+MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/final_modbus_context_autoencoder"
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/validation.txt"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/test.txt"
 BATCH_SIZE = 32
-MAX_LENGTH = 256
+MAX_LENGTH = 270
 
 # --- 2. Data Loading (Updated for Labels) ---
 def load_labeled_context_data(filepath):
