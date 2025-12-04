@@ -8,32 +8,33 @@ from transformers import (
     TrainingArguments
 )
 
-def load_context_data(filepath):
+def load_data(filepath):
     """
-    Reads Payload (col 0), Source (col 3), and Dest (col 4).
-    Combines them into: "S:<src> D:<dst> P:<payload_bytes>"
+    Reads the RAW TEXT dataset (no hex decoding needed).
     """
-    df = pd.read_csv(filepath, header=None, usecols=[0], names=['payload'])
+    # 1. Force dtype=str so Pandas treats content as text, not numbers
+    # keep_default_na=False ensures that strings like "nan" (if generated) aren't read as NaN
+    df = pd.read_csv(
+        filepath, 
+        header=None, 
+        usecols=[0], 
+        names=['payload'],
+        dtype={'payload': str}, 
+        keep_default_na=False
+    )
     
     processed_texts = []
-    
-    # Iterate through rows to format the data
-    for _, row in df.iterrows():
-        hex_str = str(row['payload'])
+    print(f"Reading {len(df)} rows from {filepath}...")
+
+    for idx, row in df.iterrows():
+        # Just read the raw text directly
+        text_content = str(row['payload']).strip()
         
-        # 1. Convert Payload Hex -> Latin-1 Bytes
-        # e.g. \x04\x03
-        try:
-            payload_bytes = bytes.fromhex(hex_str).decode('latin-1')
-        except:
-            continue # Skip corrupt lines
-        
-        # 3. Combine into Context String
-        full_text = f"{payload_bytes}"
-        
-        processed_texts.append(full_text)
-        
-    print(f"Loaded {len(processed_texts)} context-aware packets from {filepath}")
+        # Safety check: ensure it's not empty
+        if len(text_content) > 0:
+            processed_texts.append(text_content)
+            
+    print(f"Successfully loaded {len(processed_texts)} packets.")
     return processed_texts
 
 class ModbusDataset(Dataset):
@@ -70,19 +71,19 @@ class ModbusDataset(Dataset):
 if __name__ == "__main__":
     # A. Settings
     MODEL_NAME = "google/byt5-small"
-    MAX_LENGTH = 256  # Increased slightly to account for "S:XX D:XX P:" prefix
+    MAX_LENGTH = 256  
     BATCH_SIZE = 16
-    EPOCHS = 3  # You might need 5 epochs now as the task is slightly harder
+    EPOCHS = 3  
     
     # B. Load Data (Using the NEW function)
     print("Loading Training Data...")
-    train_texts = load_context_data("/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_train.csv")
+    train_texts = load_data("/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_train.csv")
     print("Loading Validation Data...")
-    val_texts = load_context_data("/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv")
+    val_texts = load_data("/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv")
 
     # C. Initialize
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, local_files_only=True)
-    model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME, local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    model = T5ForConditionalGeneration.from_pretrained(MODEL_NAME)
 
     # D. Create Datasets
     train_dataset = ModbusDataset(train_texts, tokenizer, max_length=MAX_LENGTH)
