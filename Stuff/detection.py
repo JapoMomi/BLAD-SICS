@@ -6,10 +6,10 @@ from transformers import AutoTokenizer, T5ForConditionalGeneration
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix, f1_score
 
 # --- 1. Setup & Paths ---
-MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/final_simplied_context_model"
+MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-modbus-reconstruction-finetuned"
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_test.csv"
-SAVE_RESULTS_PATH = "detection_results.csv" # <--- New file output
+SAVE_RESULTS_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results.csv" 
 BATCH_SIZE = 32
 MAX_LENGTH = 64
 
