@@ -58,8 +58,8 @@ def generate_packet(is_attack=False):
         type_ = 0
         
     # Convert payload to Hex
-    payload_hex = to_hex(content)
-    #payload_hex = content
+    #payload_hex = to_hex(content)
+    payload_hex = content
     # Random Source and Destination (1-4)
     src = random.choice([1, 2, 3, 4])
     dst = random.choice([1, 2, 3, 4])

@@ -2,6 +2,7 @@ import random
 import datasets
 import numpy as np
 import pandas as pd
+import torch # Added torch for masking logic
 from transformers import (
     ByT5Tokenizer,
     DataCollatorForSeq2Seq,
@@ -14,42 +15,24 @@ from transformers import (
 model_checkpoint = "google/byt5-small"  
 train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_train.csv" 
 valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv" 
+MASK_PROBABILITY = 0.15 # 15% masking
 
-# Define column names based on your description
-# 1: packet, 2: type1, 3: type2, 4: src, 5: dst, 6: timestamp
+# Define column names
 COLUMN_NAMES = ["packet", "type_1", "type_2", "src", "dst", "timestamp"]
 # ---------------------
-
-def show_random_elements(dataset, num_examples=5):
-    assert num_examples <= len(dataset), "Can't pick more elements than there are in the dataset."
-    picks = []
-    for _ in range(num_examples):
-        pick = random.randint(0, len(dataset) - 1)
-        while pick in picks:
-            pick = random.randint(0, len(dataset) - 1)
-        picks.append(pick)
-    
-    df = pd.DataFrame(dataset[picks])
-    print(df.head())
 
 def filter_normal_packets(data_row):
     """
     Filter to keep only normal packets.
-    Assumes 0 means normal for both type columns.
     """
-    # Check for None/Empty
     if data_row["packet"] is None or data_row["packet"] == "":
         return False
-        
-    # Check if packet is "Normal" (0)
-    # Adjust logic if only one column matters
     if data_row["type_1"] == 0 and data_row["type_2"] == 0:
         return True
-        
     return False
 
 def convert_to_features(example_batch):
-    # INPUT: The packet string
+    # 1. Tokenize inputs (Original)
     model_inputs = tokenizer(
         example_batch["packet"], 
         truncation=True, 
@@ -57,7 +40,7 @@ def convert_to_features(example_batch):
         max_length=max_len
     )
     
-    # TARGET: The same packet string (Reconstruction task)
+    # 2. Tokenize targets (Original - used as Ground Truth)
     with tokenizer.as_target_tokenizer():
         target_encodings = tokenizer(
             example_batch["packet"], 
@@ -65,22 +48,50 @@ def convert_to_features(example_batch):
             padding=False, 
             max_length=max_len
         )
+    
+    # 3. Apply MASKING to model_inputs["input_ids"]
+    # We use <extra_id_0> (sentinel) to replace random bytes
+    mask_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
+    
+    batch_input_ids = model_inputs["input_ids"]
+    masked_batch = []
+    
+    for input_ids in batch_input_ids:
+        # Convert list to array for easier manipulation
+        arr = np.array(input_ids)
         
+        # Create a mask of the same shape
+        # Avoid masking special tokens if any (though ByT5 is mostly raw bytes)
+        # We generate a random matrix
+        probability_matrix = np.random.rand(*arr.shape)
+        
+        # Create boolean mask where prob < 0.15
+        masked_indices = probability_matrix < MASK_PROBABILITY
+        
+        # Apply mask
+        arr[masked_indices] = mask_token_id
+        masked_batch.append(arr.tolist())
+        
+    # Update inputs with masked version
+    model_inputs["input_ids"] = masked_batch
+    
+    # Labels are the ORIGINAL (Unmasked) sequences
     model_inputs["labels"] = target_encodings["input_ids"]
+    
     return model_inputs
 
 # Initialize Model and Tokenizer
 model = T5ForConditionalGeneration.from_pretrained(model_checkpoint)
 tokenizer = ByT5Tokenizer.from_pretrained(model_checkpoint)
 
-max_length = 128 # Reduced from 512 as packets look shorter (~30 chars)
+max_length = 128 
 max_len = max_length
 
-# Load Dataset with column names
+# Load Dataset
 dataset = datasets.load_dataset(
     "csv", 
-    sep=",", # Assuming CSV implies comma separated based on your example
-    names=COLUMN_NAMES, # Manually assign names
+    sep=",", 
+    names=COLUMN_NAMES, 
     data_files={"train": [train_file], "valid": [valid_file]}
 )
 
@@ -89,19 +100,19 @@ print(f"Original train size: {len(dataset['train'])}")
 dataset = dataset.filter(filter_normal_packets)
 print(f"Filtered (Normal only) train size: {len(dataset['train'])}")
 
-# 2. Preprocess: Tokenize Input=Packet, Label=Packet
+# 2. Preprocess: Tokenize & Apply Masking
 dataset = dataset.map(
     convert_to_features, 
     batched=True, 
-    num_proc=4, # Reduced proc for stability
-    remove_columns=COLUMN_NAMES # Remove raw columns after tokenization
+    num_proc=4, 
+    remove_columns=COLUMN_NAMES 
 )
 
 # Metrics
-batch_size = 16 # Increased batch size slightly as packets are short
-model_name = "simplified-modbus-reconstruction"
-num_epochs = 10 
-learning_rate = 1e-4 # Increased slightly for reconstruction
+batch_size = 16 
+model_name = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-modbus-reconstruction"
+num_epochs = 5 
+learning_rate = 1e-4 
 gradient_accumulation_steps = 2
 
 finetuned_model_name = f"{model_name}-finetuned"
@@ -126,7 +137,7 @@ args = Seq2SeqTrainingArguments(
     num_train_epochs=num_epochs,
     predict_with_generate=True,
     generation_max_length=max_length,
-    report_to="none", # Change to "wandb" or "tensorboard" if needed
+    report_to="none", 
     push_to_hub=False,
 )
 
@@ -142,24 +153,18 @@ def compute_metrics(eval_preds):
     if isinstance(preds, tuple):
         preds = preds[0]
 
-    # Replace -100 in the predictions as we can't decode them.
-    # This is the line that fixes the ValueError
     preds = np.where(preds != -100, preds, tokenizer.pad_token_id)    
     decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
     
-    # Replace -100 in the labels as we can't decode them.
     labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
     decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
 
-    # Calculate Exact Match Accuracy (More useful for packets than BLEU)
     matches = [1 if p == l else 0 for p, l in zip(decoded_preds, decoded_labels)]
     accuracy = sum(matches) / len(matches)
 
     result = {"accuracy": accuracy}
-
-    # Length sanity check
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
     result["mean_gen_len"] = np.mean(prediction_lens)
 
