@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report, roc_auc_score, confusion_matr
 MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-modbus-reconstruction-finetuned"
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_test.csv"
-SAVE_RESULTS_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_prob.csv" 
+SAVE_RESULTS_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_prob_only.csv" 
 BATCH_SIZE = 32
 MAX_LENGTH = 64
 MASK_PROBABILITY = 0.15 
@@ -78,17 +78,19 @@ class ModbusDataset(Dataset):
             "labels": labels
         }
 
-# --- 4. The Core: Calculate Probabilities (FIXED) ---
-def get_metrics_and_reconstruction(model, dataset, device, tokenizer, return_reconstruction=False):
+# --- 4. The Core: Calculate Probabilities Only ---
+def get_prob_metrics_and_reconstruction(model, dataset, device, tokenizer, return_reconstruction=False):
+    """
+    Calculates:
+    1. Mean Probability (Confidence on the correct token)
+    2. Min Probability (The token the model was least confident about)
+    """
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
     model.eval()
     
-    all_losses = []
     all_mean_probs = []
     all_min_probs = []
     all_reconstructions = []
-
-    loss_fct = torch.nn.CrossEntropyLoss(reduction='none') 
 
     print(f"Processing {len(dataset)} samples...")
     
@@ -109,50 +111,57 @@ def get_metrics_and_reconstruction(model, dataset, device, tokenizer, return_rec
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
 
-            # --- 1. Loss Calculation ---
-            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-            loss = loss.view(shift_labels.size())
-            
+            # Define Valid Tokens (mask out padding)
             active_mask = shift_labels != -100
             valid_tokens_count = active_mask.sum(dim=1).clamp(min=1)
-            
-            sample_losses = (loss * active_mask).sum(dim=1) / valid_tokens_count
-            all_losses.extend(sample_losses.cpu().numpy())
 
-            # --- 2. Probability Calculation ---
+            # --- Probability Calculation ---
             probs = torch.softmax(shift_logits, dim=-1)
 
-            # FIX: Replace -100 with 0 temporarily for gather
+            # FIX: Replace -100 with 0 temporarily so gather doesn't crash
             gather_indices = shift_labels.clone()
             gather_indices[gather_indices == -100] = 0
 
-            # Get prob of TRUE label
+            # Get prob of the TRUE label
+            # gather retrieves the probability specifically for the byte that *should* be there
             true_token_probs = probs.gather(2, gather_indices.unsqueeze(-1)).squeeze(-1)
 
-            # Mean Prob
+            # A. Mean Probability
             sample_mean_probs = (true_token_probs * active_mask).sum(dim=1) / valid_tokens_count
             all_mean_probs.extend(sample_mean_probs.cpu().numpy())
 
-            # Min Prob
+            # B. Min Probability
+            # Set ignored tokens to 1.0 so they don't affect the minimum finding
             masked_probs_for_min = true_token_probs.clone()
             masked_probs_for_min[~active_mask] = 1.0 
             sample_min_probs, _ = masked_probs_for_min.min(dim=1)
             all_min_probs.extend(sample_min_probs.cpu().numpy())
 
-            # --- 3. Reconstruction ---
+            # --- Reconstruction ---
             if return_reconstruction:
                 predicted_ids = torch.argmax(logits, dim=-1)
                 decoded_batch = tokenizer.batch_decode(predicted_ids, skip_special_tokens=True)
-                all_reconstructions.extend(decoded_batch)
+                
+                # Calculate the true length of each packet (ignoring padding -100)
+                # We subtract 1 to account for the EOS token usually added by the tokenizer
+                true_lengths = (labels != -100).sum(dim=1) - 1
+                
+                clean_batch = []
+                for text, length in zip(decoded_batch, true_lengths):
+                    # Truncate the text to its original length to remove the trailing garbage
+                    # We use max(0, length) just to be safe against empty strings
+                    clean_batch.append(text[:max(0, int(length.item()))])
+                
+                all_reconstructions.extend(clean_batch)
             
     if return_reconstruction:
-        return np.array(all_losses), np.array(all_mean_probs), np.array(all_min_probs), all_reconstructions
+        return np.array(all_mean_probs), np.array(all_min_probs), all_reconstructions
     else:
-        return np.array(all_losses), np.array(all_mean_probs), np.array(all_min_probs)
+        return np.array(all_mean_probs), np.array(all_min_probs)
 
 # --- 5. Main Execution ---
 if __name__ == "__main__":
-    print("Starting Detection...")
+    print("Starting Detection (Probability Only)...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
@@ -169,46 +178,44 @@ if __name__ == "__main__":
     test_dataset = ModbusDataset(test_texts, tokenizer, max_length=MAX_LENGTH, mask_prob=MASK_PROBABILITY)
 
     # C. Calculate Metrics
-    print("Calculating Validation Metrics...")
-    val_losses, val_mean_probs, val_min_probs = get_metrics_and_reconstruction(
+    print("Calculating Validation Probabilities...")
+    val_mean_probs, val_min_probs = get_prob_metrics_and_reconstruction(
         model, val_dataset, device, tokenizer, return_reconstruction=False)
     
-    print("Calculating Test Metrics...")
-    test_losses, test_mean_probs, test_min_probs, test_reconstructions = get_metrics_and_reconstruction(
+    print("Calculating Test Probabilities...")
+    test_mean_probs, test_min_probs, test_reconstructions = get_prob_metrics_and_reconstruction(
         model, test_dataset, device, tokenizer, return_reconstruction=True)
 
-    # D. Determine Threshold
-    # We use the 1st percentile of Validation Mean Probabilities as the cutoff
-    # Anything with LOWER probability than this is considered anomalous
-    prob_threshold = np.percentile(val_mean_probs, 1) 
+    # D. Determine Threshold using MIN PROBABILITY
+    # We use the 1st percentile of Validation MIN Probabilities as the cutoff
+    prob_threshold = np.percentile(val_min_probs, 1) 
     print(f"\n--- Results ---")
-    print(f"Probability Threshold (1st percentile Val): {prob_threshold:.6f}")
+    print(f"Min Probability Threshold (1st percentile Val): {prob_threshold:.10f}")
 
     # E. Predict
-    # Normal: Prob > Threshold
-    # Attack: Prob < Threshold
-    predictions = (test_mean_probs < prob_threshold).astype(int)
+    # Attack if the WEAKEST token is below the threshold
+    predictions = (test_min_probs < prob_threshold).astype(int)
     
     # F. Confusion Matrix & Metrics
     print("\nClassification Report:")
     print(classification_report(test_labels, predictions, target_names=["Benign", "Attack"]))
     
-    # --- ADDED BACK CONFUSION MATRIX ---
     cm = confusion_matrix(test_labels, predictions)
     print("\nConfusion Matrix:")
     print(f"True Benign:        {cm[0][0]} | False Attack (FP): {cm[0][1]}")
     print(f"Missed Attack (FN): {cm[1][0]} | True Attack (TP):  {cm[1][1]}")
-    # -----------------------------------
 
-    auc = roc_auc_score(test_labels, 1 - test_mean_probs) # Invert because low prob = high anomaly score
+    # AUC based on Min Prob
+    auc = roc_auc_score(test_labels, 1 - test_min_probs) 
     print(f"ROC AUC Score: {auc:.4f}")
 
-    benign_probs = test_mean_probs[np.array(test_labels) == 0]
-    attack_probs = test_mean_probs[np.array(test_labels) == 1]
+    # Statistics for Min Prob
+    benign_min = test_min_probs[np.array(test_labels) == 0]
+    attack_min = test_min_probs[np.array(test_labels) == 1]
 
     print(f"\n--- Statistics ---")
-    print(f"Benign -> Mean Confidence: {np.mean(benign_probs):.6f}")
-    print(f"Attack -> Mean Confidence: {np.mean(attack_probs):.6f}")
+    print(f"Benign -> Avg Min Confidence: {np.mean(benign_min):.10f}")
+    print(f"Attack -> Avg Min Confidence: {np.mean(attack_min):.10f}")
 
     # G. Save
     print(f"\nSaving results to {SAVE_RESULTS_PATH}...")
@@ -217,7 +224,6 @@ if __name__ == "__main__":
         'Reconstructed': test_reconstructions,
         'Label_True': test_labels,
         'Label_Pred': predictions,
-        'Loss_Score': test_losses,
         'Mean_Prob_Score': test_mean_probs,
         'Min_Prob_Score': test_min_probs
     })
