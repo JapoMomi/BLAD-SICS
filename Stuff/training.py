@@ -15,7 +15,7 @@ from transformers import (
 model_checkpoint = "google/byt5-small"  
 train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_train.csv" 
 valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv" 
-MASK_PROBABILITY = 0.15 
+MASK_PROBABILITY = 0.25 
 
 COLUMN_NAMES = ["packet", "type_1", "type_2", "src", "dst", "timestamp"]
 
@@ -102,7 +102,7 @@ dataset = dataset.map(
 )
 
 # Training Args
-finetuned_model_name = "simplified-hex_modbus-reconstruction-finetuned"
+finetuned_model_name = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-hex_modbus-reconstruction-finetuned"
 args = Seq2SeqTrainingArguments(
     output_dir=finetuned_model_name,
     overwrite_output_dir=True,

@@ -169,7 +169,7 @@ if __name__ == "__main__":
         model, test_dataset, device, tokenizer, return_reconstruction=True)
 
     # Threshold
-    prob_threshold = np.percentile(val_min_log, 1) 
+    prob_threshold = np.percentile(val_min_log, 3) 
     print(f"\nLog-Prob Threshold: {prob_threshold:.6f}")
 
     # Predict (Lower score = Attack)
