@@ -6,16 +6,21 @@ from transformers import AutoTokenizer, T5ForConditionalGeneration
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 
 # --- 1. Setup ---
-MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-hex_modbus-reconstruction-finetuned"
+MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-hex_modbus-sequence_5-finetuned" # Path updated to match training output
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_test.csv"
-SAVE_RESULTS_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_prob_only.csv" 
+SAVE_RESULTS_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_sequences.csv" # Updated name
 BATCH_SIZE = 32
-MAX_LENGTH = 128 # Increased for safety
-MASK_PROBABILITY = 0.15 
+MASK_PROBABILITY = 0.25 
 
-# --- 2. Data Loading ---
-def load_labeled_context_data(filepath):
+# --- NEW SEQUENCE CONFIGURATION ---
+SEQUENCE_LENGTH = 5        # N packets per sequence
+MAX_LENGTH = 1024          # New sequence max length
+PACKET_SEPARATOR = '     ' # 5 blank spaces
+# ----------------------------------
+
+# --- 2. Data Loading (Modified for Sequences) ---
+def load_labeled_context_data(filepath, N, separator):
     df = pd.read_csv(
         filepath, 
         header=None, 
@@ -24,22 +29,34 @@ def load_labeled_context_data(filepath):
         dtype={'payload': str}, 
         keep_default_na=False
     )
-    df['is_attack'] = ((df['cat'] != 0) | (df['type'] != 0)).astype(int)
     
-    processed_texts = []
-    final_labels = []
+    # Label each individual packet
+    is_attack_labels = ((df['cat'] != 0) | (df['type'] != 0)).astype(int).tolist()
     
-    for _, row in df.iterrows():
-        text_content = str(row['payload']).strip()
-        if len(text_content) > 0:
-            processed_texts.append(text_content)
-            final_labels.append(row['is_attack'])
-        
-    return processed_texts, final_labels
+    processed_sequences = []
+    final_sequence_labels = []
+    
+    # Group into sequences of N
+    for i in range(0, len(df), N):
+        chunk = df.iloc[i:i + N]
+        if len(chunk) < N: # Drop incomplete last chunk
+            continue
 
-# --- 3. Dataset Class (With Hex Conversion) ---
+        # Concatenate packet payloads
+        sequence_payload = separator.join(chunk['payload'].tolist())
+        
+        # Sequence label: 1 if max label in chunk is 1, 0 otherwise
+        chunk_labels = is_attack_labels[i:i+N]
+        sequence_label = max(chunk_labels)
+        
+        processed_sequences.append(sequence_payload)
+        final_sequence_labels.append(sequence_label)
+
+    return processed_sequences, final_sequence_labels
+
+# --- 3. Dataset Class (Re-using logic, max_length is the only change) ---
 class ModbusDataset(Dataset):
-    def __init__(self, texts, tokenizer, max_length=128, mask_prob=0.15):
+    def __init__(self, texts, tokenizer, max_length, mask_prob):
         self.texts = texts
         self.tokenizer = tokenizer
         self.max_length = max_length
@@ -50,15 +67,22 @@ class ModbusDataset(Dataset):
         return len(self.texts)
 
     def __getitem__(self, idx):
+        # hex_text is now the sequence of concatenated hex strings
         hex_text = self.texts[idx]
         
-        # --- CONVERT HEX STRING TO RAW BYTES ---
-        try:
-            # Decode hex to raw bytes string for ByT5
-            raw_content = bytes.fromhex(hex_text).decode('utf-8', errors='ignore')
-        except:
-            raw_content = hex_text # Fallback
-            
+        # --- CONVERT HEX SEQUENCE STRING TO RAW BYTES SEQUENCE STRING ---
+        packet_list = hex_text.split(PACKET_SEPARATOR)
+        raw_content_list = []
+        for hex_segment in packet_list:
+            # Decode each segment individually to handle spaces gracefully
+            try:
+                 raw_content_list.append(bytes.fromhex(hex_segment).decode('utf-8', errors='ignore'))
+            except:
+                 raw_content_list.append(hex_segment) # Fallback to hex if decoding fails
+                 
+        raw_content = PACKET_SEPARATOR.join(raw_content_list)
+        
+        # Encoding using the new MAX_LENGTH
         encoding = self.tokenizer(
             raw_content, 
             max_length=self.max_length,
@@ -84,7 +108,7 @@ class ModbusDataset(Dataset):
             "labels": labels
         }
 
-# --- 4. The Core: Calculate Log-Probabilities ---
+# --- 4. The Core: Calculate Log-Probabilities (Unchanged) ---
 def get_logprob_metrics(model, dataset, device, tokenizer, return_reconstruction=False):
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
     model.eval()
@@ -137,7 +161,9 @@ def get_logprob_metrics(model, dataset, device, tokenizer, return_reconstruction
                 true_lengths = (labels != -100).sum(dim=1) - 1
                 clean_batch = []
                 for text, length in zip(decoded_batch, true_lengths):
-                    clean_batch.append(text[:max(0, int(length.item()))])
+                    # Need to be careful here: the length is in BYTES, not characters.
+                    # We will simply return the decoded batch without complex trimming.
+                    clean_batch.append(text) 
                 all_reconstructions.extend(clean_batch)
             
     # Ensure consistent returns
@@ -148,14 +174,15 @@ def get_logprob_metrics(model, dataset, device, tokenizer, return_reconstruction
 
 # --- 5. Main Execution ---
 if __name__ == "__main__":
-    print("Starting Detection (Hex->Bytes + Log-Prob)...")
+    print(f"Starting Sequence Detection (N={SEQUENCE_LENGTH} with '{PACKET_SEPARATOR}' separator)...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
     model = T5ForConditionalGeneration.from_pretrained(MODEL_PATH, local_files_only=True).to(device)
 
-    val_texts, val_labels = load_labeled_context_data(VAL_PATH)
-    test_texts, test_labels = load_labeled_context_data(TEST_PATH)
+    # Load data as sequences
+    val_texts, val_labels = load_labeled_context_data(VAL_PATH, SEQUENCE_LENGTH, PACKET_SEPARATOR)
+    test_texts, test_labels = load_labeled_context_data(TEST_PATH, SEQUENCE_LENGTH, PACKET_SEPARATOR)
 
     val_dataset = ModbusDataset(val_texts, tokenizer, max_length=MAX_LENGTH, mask_prob=MASK_PROBABILITY)
     test_dataset = ModbusDataset(test_texts, tokenizer, max_length=MAX_LENGTH, mask_prob=MASK_PROBABILITY)
@@ -168,9 +195,9 @@ if __name__ == "__main__":
     test_mean_log, test_min_log, test_reconstructions = get_logprob_metrics(
         model, test_dataset, device, tokenizer, return_reconstruction=True)
 
-    # Threshold
-    prob_threshold = np.percentile(val_min_log, 3) 
-    print(f"\nLog-Prob Threshold: {prob_threshold:.6f}")
+    # Threshold (Using 1st percentile of validation data)
+    prob_threshold = np.percentile(val_min_log, 1) 
+    print(f"\nLog-Prob Threshold (1st percentile): {prob_threshold:.6f}")
 
     # Predict (Lower score = Attack)
     predictions = (test_min_log < prob_threshold).astype(int)
@@ -186,8 +213,8 @@ if __name__ == "__main__":
 
     # Save
     results_df = pd.DataFrame({
-        'Original_Hex': test_texts,
-        'Reconstructed_Bytes': test_reconstructions,
+        'Original_Sequence_Hex': test_texts,
+        'Reconstructed_Sequence_Bytes': test_reconstructions,
         'Label_True': test_labels,
         'Label_Pred': predictions,
         'Mean_LogProb': test_mean_log,
