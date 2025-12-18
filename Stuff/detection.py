@@ -5,21 +5,16 @@ import numpy as np
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 
-# --- 1. Setup ---
-MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-hex_modbus-sequence_5-finetuned" # Path updated to match training output
+# --- 1. CONFIGURATION ---
+SEQUENCE_LENGTH = 5        
+MAX_LENGTH = 1024          
+PACKET_SEPARATOR = ' '      
+# UPDATE THIS PATH to point to the model created by training.py
+MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned" 
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_test.csv"
-SAVE_RESULTS_PATH = "/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_sequences.csv" # Updated name
-BATCH_SIZE = 32
-MASK_PROBABILITY = 0.25 
 
-# --- NEW SEQUENCE CONFIGURATION ---
-SEQUENCE_LENGTH = 5        # N packets per sequence
-MAX_LENGTH = 1024          # New sequence max length
-PACKET_SEPARATOR = '     ' # 5 blank spaces
-# ----------------------------------
-
-# --- 2. Data Loading (Modified for Sequences) ---
+# --- 2. Data Loading ---
 def load_labeled_context_data(filepath, N, separator):
     df = pd.read_csv(
         filepath, 
@@ -30,7 +25,7 @@ def load_labeled_context_data(filepath, N, separator):
         keep_default_na=False
     )
     
-    # Label each individual packet
+    # Label each individual packet (1 if Attack, 0 if Benign)
     is_attack_labels = ((df['cat'] != 0) | (df['type'] != 0)).astype(int).tolist()
     
     processed_sequences = []
@@ -39,186 +34,167 @@ def load_labeled_context_data(filepath, N, separator):
     # Group into sequences of N
     for i in range(0, len(df), N):
         chunk = df.iloc[i:i + N]
-        if len(chunk) < N: # Drop incomplete last chunk
-            continue
+        if len(chunk) < N: continue
 
-        # Concatenate packet payloads
+        # Join Hex payloads (We convert to Bytes later in Dataset)
         sequence_payload = separator.join(chunk['payload'].tolist())
         
-        # Sequence label: 1 if max label in chunk is 1, 0 otherwise
+        # Sequence label: 1 if ANY packet in chunk is an attack
         chunk_labels = is_attack_labels[i:i+N]
-        sequence_label = max(chunk_labels)
+        sequence_label = 1 if max(chunk_labels) > 0 else 0
         
         processed_sequences.append(sequence_payload)
         final_sequence_labels.append(sequence_label)
 
     return processed_sequences, final_sequence_labels
 
-# --- 3. Dataset Class (Re-using logic, max_length is the only change) ---
+# --- 3. Dataset Class (NO MASKING HERE) ---
 class ModbusDataset(Dataset):
-    def __init__(self, texts, tokenizer, max_length, mask_prob):
+    def __init__(self, texts, tokenizer, max_length):
         self.texts = texts
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.mask_prob = mask_prob
-        self.mask_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
 
     def __len__(self):
         return len(self.texts)
 
     def __getitem__(self, idx):
-        # hex_text is now the sequence of concatenated hex strings
         hex_text = self.texts[idx]
         
-        # --- CONVERT HEX SEQUENCE STRING TO RAW BYTES SEQUENCE STRING ---
+        # --- HEX TO BYTES CONVERSION (Matching Training) ---
         packet_list = hex_text.split(PACKET_SEPARATOR)
         raw_content_list = []
         for hex_segment in packet_list:
-            # Decode each segment individually to handle spaces gracefully
             try:
-                 raw_content_list.append(bytes.fromhex(hex_segment).decode('utf-8', errors='ignore'))
+                # Decode hex to bytes -> Latin-1 string
+                raw_content_list.append(bytes.fromhex(hex_segment).decode('latin-1'))
             except:
-                 raw_content_list.append(hex_segment) # Fallback to hex if decoding fails
+                raw_content_list.append(hex_segment)
                  
         raw_content = PACKET_SEPARATOR.join(raw_content_list)
         
-        # Encoding using the new MAX_LENGTH
+        # Tokenize (Clean Input)
         encoding = self.tokenizer(
             raw_content, 
             max_length=self.max_length,
             padding="max_length", 
             truncation=True, 
-            return_tensors="pt")
+            return_tensors="pt"
+        )
         
-        original_input_ids = encoding.input_ids.squeeze()
+        input_ids = encoding.input_ids.squeeze()
         attention_mask = encoding.attention_mask.squeeze()
         
-        labels = original_input_ids.clone()
-        labels[labels == self.tokenizer.pad_token_id] = -100
-        
-        input_ids = original_input_ids.clone()
-        probability_matrix = torch.full(input_ids.shape, self.mask_prob)
-        masked_indices = torch.bernoulli(probability_matrix).bool()
-        masked_indices = masked_indices & (input_ids != self.tokenizer.pad_token_id)
-        input_ids[masked_indices] = self.mask_token_id
-
+        # Return clean input. Labels = Input for calculation
         return {
             "input_ids": input_ids, 
-            "attention_mask": attention_mask, 
-            "labels": labels
+            "attention_mask": attention_mask,
+            "labels": input_ids.clone()
         }
 
-# --- 4. The Core: Calculate Log-Probabilities (Unchanged) ---
-def get_logprob_metrics(model, dataset, device, tokenizer, return_reconstruction=False):
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+# --- 4. Sliding Window Scoring Function ---
+def get_anomaly_scores(model, dataset, device, tokenizer):
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     model.eval()
     
-    all_mean_logprobs = []
-    all_min_logprobs = []
-    all_reconstructions = []
-
-    print(f"Processing {len(dataset)} samples...")
+    anomaly_scores = []
+    # ByT5 Sentinel Token ID for <extra_id_0>
+    mask_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
     
+    print(f"Scoring {len(dataset)} sequences using Sliding Window Masking...")
+
     with torch.no_grad():
-        for batch in dataloader:
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device) 
-            labels = batch['labels'].to(device)
-
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-            logits = outputs.logits 
-
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-
-            active_mask = shift_labels != -100
-            valid_tokens_count = active_mask.sum(dim=1).clamp(min=1)
-
-            # Use Log Softmax to avoid underflow
-            log_probs = torch.nn.functional.log_softmax(shift_logits, dim=-1)
-
-            gather_indices = shift_labels.clone()
-            gather_indices[gather_indices == -100] = 0
-
-            true_token_log_probs = log_probs.gather(2, gather_indices.unsqueeze(-1)).squeeze(-1)
-
-            # A. Mean Log-Prob
-            sample_mean_logprobs = (true_token_log_probs * active_mask).sum(dim=1) / valid_tokens_count
-            all_mean_logprobs.extend(sample_mean_logprobs.cpu().numpy())
-
-            # B. Min Log-Prob
-            # Set ignored tokens to 0.0 (max probability) so they don't affect min
-            masked_log_probs = true_token_log_probs.clone()
-            masked_log_probs[~active_mask] = 0.0 
-            sample_min_logprobs, _ = masked_log_probs.min(dim=1)
-            all_min_logprobs.extend(sample_min_logprobs.cpu().numpy())
-
-            # C. Reconstruction
-            if return_reconstruction:
-                predicted_ids = torch.argmax(logits, dim=-1)
-                decoded_batch = tokenizer.batch_decode(predicted_ids, skip_special_tokens=True)
-                # Trim to original length
-                true_lengths = (labels != -100).sum(dim=1) - 1
-                clean_batch = []
-                for text, length in zip(decoded_batch, true_lengths):
-                    # Need to be careful here: the length is in BYTES, not characters.
-                    # We will simply return the decoded batch without complex trimming.
-                    clean_batch.append(text) 
-                all_reconstructions.extend(clean_batch)
+        for i, batch in enumerate(dataloader):
+            if i % 50 == 0: print(f"Processing sample {i}...")
             
-    # Ensure consistent returns
-    if return_reconstruction:
-        return np.array(all_mean_logprobs), np.array(all_min_logprobs), all_reconstructions
-    else:
-        return np.array(all_mean_logprobs), np.array(all_min_logprobs)
+            original_input_ids = batch['input_ids'].to(device) # [1, SeqLen]
+            labels = batch['labels'].to(device)
+            
+            # Find actual length (ignore padding)
+            non_pad = (original_input_ids != tokenizer.pad_token_id).sum().item()
+            
+            # Window Setup
+            window_size = 20  # Size of mask
+            stride = 5       # Step size
+            
+            chunk_scores = []
+            
+            # Slide over the valid content
+            for j in range(0, non_pad, stride):
+                masked_input = original_input_ids.clone()
+                end = min(j + window_size, non_pad)
+                
+                # Apply Mask to window
+                masked_input[0, j:end] = mask_token_id
+                
+                # Forward Pass
+                outputs = model(input_ids=masked_input, labels=labels)
+                log_probs = torch.nn.functional.log_softmax(outputs.logits, dim=-1)
+                
+                # Get probability of TRUE token
+                target_ids = labels.unsqueeze(-1)
+                token_log_probs = log_probs.gather(-1, target_ids).squeeze(-1)
+                
+                # Score = Average LogProb of the MASKED window only
+                window_log_probs = token_log_probs[0, j:end]
+                score = window_log_probs.mean().item()
+                chunk_scores.append(score)
+            
+            # Anomaly Score = The WORST (lowest) chunk score in the sequence
+            # If any part of the sequence was unpredictable, it's an anomaly.
+            anomaly_scores.append(min(chunk_scores) if chunk_scores else -100)
+
+    return np.array(anomaly_scores)
 
 # --- 5. Main Execution ---
 if __name__ == "__main__":
-    print(f"Starting Sequence Detection (N={SEQUENCE_LENGTH} with '{PACKET_SEPARATOR}' separator)...")
+    print(f"Starting Sequence Detection (N={SEQUENCE_LENGTH})...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
+    print(f"Loading Model from {MODEL_PATH}...")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
     model = T5ForConditionalGeneration.from_pretrained(MODEL_PATH, local_files_only=True).to(device)
 
-    # Load data as sequences
+    # Load Data
     val_texts, val_labels = load_labeled_context_data(VAL_PATH, SEQUENCE_LENGTH, PACKET_SEPARATOR)
     test_texts, test_labels = load_labeled_context_data(TEST_PATH, SEQUENCE_LENGTH, PACKET_SEPARATOR)
 
-    val_dataset = ModbusDataset(val_texts, tokenizer, max_length=MAX_LENGTH, mask_prob=MASK_PROBABILITY)
-    test_dataset = ModbusDataset(test_texts, tokenizer, max_length=MAX_LENGTH, mask_prob=MASK_PROBABILITY)
+    val_dataset = ModbusDataset(val_texts, tokenizer, max_length=MAX_LENGTH)
+    test_dataset = ModbusDataset(test_texts, tokenizer, max_length=MAX_LENGTH)
 
-    # Validation
-    val_mean_log, val_min_log = get_logprob_metrics(
-        model, val_dataset, device, tokenizer, return_reconstruction=False)
+    # 1. Validation (Benign) Scores
+    print("\n--- Calculating Validation Threshold ---")
+    #val_scores = get_anomaly_scores(model, val_dataset, device, tokenizer)
     
-    # Test (Calculates reconstructions too)
-    test_mean_log, test_min_log, test_reconstructions = get_logprob_metrics(
-        model, test_dataset, device, tokenizer, return_reconstruction=True)
+    # Threshold = 1st percentile (We expect most benign data to have higher scores)
+    # Scores are negative LogProbs (e.g., -0.1 is Good, -10.0 is Bad)
+    #prob_threshold = np.percentile(val_scores, 3) 
+    #print(f"Validation Scores -> Mean: {val_scores.mean():.4f}, Min: {val_scores.min():.4f}")
+    #print(f"Selected Threshold (1st percentile): {prob_threshold:.4f}")
 
-    # Threshold (Using 1st percentile of validation data)
-    prob_threshold = np.percentile(val_min_log, 1) 
-    print(f"\nLog-Prob Threshold (1st percentile): {prob_threshold:.6f}")
-
-    # Predict (Lower score = Attack)
-    predictions = (test_min_log < prob_threshold).astype(int)
+    # 2. Test Scores
+    print("\n--- Evaluating Test Set ---")
+    test_scores = get_anomaly_scores(model, test_dataset, device, tokenizer)
     
-    # Metrics
+    # 3. Predict
+    # If Score < Threshold => Anomaly (Attack)
+    #predictions = (test_scores < prob_threshold).astype(int)
+    predictions = (test_scores < -4.4897).astype(int)
+    
+    # 4. Metrics
     print("\nClassification Report:")
     print(classification_report(test_labels, predictions, target_names=["Benign", "Attack"]))
     
     cm = confusion_matrix(test_labels, predictions)
     print(f"Confusion Matrix:\nTP: {cm[1][1]} | FN: {cm[1][0]}\nFP: {cm[0][1]} | TN: {cm[0][0]}")
 
-    print(f"ROC AUC: {roc_auc_score(test_labels, -test_min_log):.4f}")
+    print(f"ROC AUC: {roc_auc_score(test_labels, -test_scores):.4f}")
 
-    # Save
+    # Save Results
     results_df = pd.DataFrame({
-        'Original_Sequence_Hex': test_texts,
-        'Reconstructed_Sequence_Bytes': test_reconstructions,
         'Label_True': test_labels,
         'Label_Pred': predictions,
-        'Mean_LogProb': test_mean_log,
-        'Min_LogProb': test_min_log
+        'Anomaly_Score': test_scores
     })
-    results_df.to_csv(SAVE_RESULTS_PATH, index=False)
+    results_df.to_csv("/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_sliding_window.csv", index=False)
     print("Done.")
