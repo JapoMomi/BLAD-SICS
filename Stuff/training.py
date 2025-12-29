@@ -13,13 +13,12 @@ from transformers import (
 
 # --- CONFIGURATION ---
 model_checkpoint = "google/byt5-small"
-# UPDATE THESE PATHS TO YOUR ACTUAL FILE LOCATIONS
 train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/train.txt"
 valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/validation.txt"
 
 MASK_PROB = 0.15  
 # Hyperparameters
-SEQUENCE_LENGTH = 3         # Number of packets per sequence
+SEQUENCE_LENGTH = 5         # Number of packets per sequence
 SEPARATOR = " "             # Space separator for byte-level model
 MAX_TOKEN_LENGTH = 512     # Fixed length (must match detection)
 
@@ -127,12 +126,24 @@ if __name__ == "__main__":
     model = T5ForConditionalGeneration.from_pretrained(model_checkpoint)
     tokenizer = ByT5Tokenizer.from_pretrained(model_checkpoint)
 
-    dataset = datasets.load_dataset(
-        "csv", 
-        sep=",", 
-        names=COLUMN_NAMES, 
-        data_files={"train": [train_file], "valid": [valid_file]}
-    )
+    #dataset = datasets.load_dataset(
+    #    "csv", 
+    #    sep=",", 
+    #    names=COLUMN_NAMES, 
+    #    data_files={"train": [train_file], "valid": [valid_file]}
+    #)
+    print("Loading data via Pandas to avoid SegFault...")
+    train_df = pd.read_csv(train_file, names=COLUMN_NAMES, header=None, dtype=str)
+    valid_df = pd.read_csv(valid_file, names=COLUMN_NAMES, header=None, dtype=str)
+    train_dataset = datasets.Dataset.from_pandas(train_df)
+    valid_dataset = datasets.Dataset.from_pandas(valid_df)
+    dataset = datasets.DatasetDict({
+        "train": train_dataset,
+        "valid": valid_dataset
+    })
+    
+    print(f"Loaded Train: {len(dataset['train'])} rows")
+    print(f"Loaded Valid: {len(dataset['valid'])} rows")
 
     # 1. Convert Hex to Latin-1 Bytes
     print("Converting Hex to Raw Bytes (Latin-1)...")
