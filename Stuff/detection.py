@@ -4,15 +4,16 @@ from torch.utils.data import DataLoader, Dataset
 import numpy as np
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
+import os
 
 # --- 1. CONFIGURATION ---
 SEQUENCE_LENGTH = 5        
-MAX_LENGTH = 1024          
+MAX_LENGTH = 512         
 PACKET_SEPARATOR = ' '      
 # UPDATE THIS PATH to point to the model created by training.py
-MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned" 
-VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv"
-TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_test.csv"
+MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned" 
+VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/validation.txt"
+TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/test.txt"
 
 # --- 2. Data Loading ---
 def load_labeled_context_data(filepath, N, separator):
@@ -97,7 +98,11 @@ def get_anomaly_scores(model, dataset, device, tokenizer):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     model.eval()
     
-    anomaly_scores = []
+    # Lists to store the stats for each sequence
+    seq_means = []
+    seq_mins = []
+    seq_medians = []
+
     # ByT5 Sentinel Token ID for <extra_id_0>
     mask_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
     
@@ -114,8 +119,8 @@ def get_anomaly_scores(model, dataset, device, tokenizer):
             non_pad = (original_input_ids != tokenizer.pad_token_id).sum().item()
             
             # Window Setup
-            window_size = 20  # Size of mask
-            stride = 5       # Step size
+            window_size = 5  # Size of mask
+            stride = 2       # Step size
             
             chunk_scores = []
             
@@ -140,11 +145,23 @@ def get_anomaly_scores(model, dataset, device, tokenizer):
                 score = window_log_probs.mean().item()
                 chunk_scores.append(score)
             
-            # Anomaly Score = The WORST (lowest) chunk score in the sequence
-            # If any part of the sequence was unpredictable, it's an anomaly.
-            anomaly_scores.append(min(chunk_scores) if chunk_scores else -100)
+            # --- Store Stats ---
+            if chunk_scores:
+                seq_means.append(np.mean(chunk_scores))
+                seq_mins.append(np.min(chunk_scores))
+                seq_medians.append(np.median(chunk_scores))
+            else:
+                # Fallback for empty/failed sequences
+                seq_means.append(-100)
+                seq_mins.append(-100)
+                seq_medians.append(-100)
 
-    return np.array(anomaly_scores)
+    # Return a dictionary of arrays
+    return {
+        "mean": np.array(seq_means),
+        "min": np.array(seq_mins),
+        "median": np.array(seq_medians)
+    }
 
 # --- 5. Main Execution ---
 if __name__ == "__main__":
@@ -164,22 +181,28 @@ if __name__ == "__main__":
 
     # 1. Validation (Benign) Scores
     print("\n--- Calculating Validation Threshold ---")
-    #val_scores = get_anomaly_scores(model, val_dataset, device, tokenizer)
+    val_results = get_anomaly_scores(model, val_dataset, device, tokenizer)
     
-    # Threshold = 1st percentile (We expect most benign data to have higher scores)
-    # Scores are negative LogProbs (e.g., -0.1 is Good, -10.0 is Bad)
-    #prob_threshold = np.percentile(val_scores, 3) 
-    #print(f"Validation Scores -> Mean: {val_scores.mean():.4f}, Min: {val_scores.min():.4f}")
-    #print(f"Selected Threshold (1st percentile): {prob_threshold:.4f}")
+    # We use the MEAN score to determine the threshold (consistent with previous logic)
+    val_scores_mean = val_results["median"]
+    
+    # Threshold = 2nd percentile (Adjusted for Real Data Noise)
+    prob_threshold = np.percentile(val_scores_mean, 2) 
+
+    print(f"Validation Mean Stats -> Mean: {val_scores_mean.mean():.4f}, Min: {val_scores_mean.min():.4f}")
+    print(f"Selected Threshold (2th percentile of Mean scores): {prob_threshold:.4f}")
 
     # 2. Test Scores
     print("\n--- Evaluating Test Set ---")
-    test_scores = get_anomaly_scores(model, test_dataset, device, tokenizer)
+    test_results = get_anomaly_scores(model, test_dataset, device, tokenizer)
     
-    # 3. Predict
-    # If Score < Threshold => Anomaly (Attack)
-    #predictions = (test_scores < prob_threshold).astype(int)
-    predictions = (test_scores < -4.4897).astype(int)
+    # Extract arrays
+    test_means = test_results["mean"]
+    test_mins = test_results["min"]
+    test_median = test_results["median"]
+    
+    # 3. Predict (Using the Mean score vs Threshold)
+    predictions = (test_means < prob_threshold).astype(int)
     
     # 4. Metrics
     print("\nClassification Report:")
@@ -188,13 +211,17 @@ if __name__ == "__main__":
     cm = confusion_matrix(test_labels, predictions)
     print(f"Confusion Matrix:\nTP: {cm[1][1]} | FN: {cm[1][0]}\nFP: {cm[0][1]} | TN: {cm[0][0]}")
 
-    print(f"ROC AUC: {roc_auc_score(test_labels, -test_scores):.4f}")
+    print(f"ROC AUC (on Mean): {roc_auc_score(test_labels, -test_means):.4f}")
 
-    # Save Results
+    # Save Results CSV with MIN, MEAN, MAX
     results_df = pd.DataFrame({
         'Label_True': test_labels,
         'Label_Pred': predictions,
-        'Anomaly_Score': test_scores
+        'Score_Mean': test_means,
+        'Score_Min': test_mins,
+        'Score_Median': test_median
     })
-    results_df.to_csv("/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_sliding_window.csv", index=False)
-    print("Done.")
+    
+    output_csv_path = "/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_sliding_window.csv"
+    results_df.to_csv(output_csv_path, index=False)
+    print(f"Done. Results saved to {output_csv_path}")

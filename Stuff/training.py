@@ -14,12 +14,12 @@ from transformers import (
 # --- CONFIGURATION ---
 model_checkpoint = "google/byt5-small"
 # UPDATE THESE PATHS TO YOUR ACTUAL FILE LOCATIONS
-train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_train.csv"
-valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/simplified_dataset/simple_mixed_val.csv"
+train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/train.txt"
+valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/validation.txt"
 
+MASK_PROB = 0.15  
 # Hyperparameters
-MASK_PROBABILITY = 0.25     # 25% random masking for training
-SEQUENCE_LENGTH = 5         # Number of packets per sequence
+SEQUENCE_LENGTH = 3         # Number of packets per sequence
 SEPARATOR = " "             # Space separator for byte-level model
 MAX_TOKEN_LENGTH = 512     # Fixed length (must match detection)
 
@@ -63,7 +63,6 @@ def group_into_sequences(examples):
     return {"packet": grouped_packets}
 
 def tokenize_and_mask(example_batch):
-    # 1. Tokenize inputs (Grouped Sequences)
     model_inputs = tokenizer(
         example_batch["packet"], 
         truncation=True, 
@@ -71,41 +70,55 @@ def tokenize_and_mask(example_batch):
         max_length=MAX_TOKEN_LENGTH
     )
     
-    # 2. Prepare Labels (The Target is the clean original sequence)
-    # We copy input_ids to labels BEFORE masking
+    # Clone input_ids for labels
     labels = model_inputs["input_ids"].copy()
-    
-    # 3. Apply Random Masking
-    mask_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
     input_ids = model_inputs["input_ids"]
+    mask_token_id = tokenizer.convert_tokens_to_ids("<extra_id_0>")
     
     masked_input_ids = []
     
     for i, seq in enumerate(input_ids):
         seq_arr = np.array(seq)
+        seq_len = len(seq)
         
-        # Don't mask special tokens (0=Pad, 1=EOS in ByT5)
+        # Determine how many tokens total to mask
+        num_tokens_to_mask = int(seq_len * MASK_PROB)
+        
+        # Create a boolean mask
+        mask = np.full(seq_len, False)
+        
+        # Iteratively add spans until we reach the target mask count
+        masked_count = 0
+        while masked_count < num_tokens_to_mask:
+            # Randomize Span Length (e.g., between 2 and 8 bytes)
+            # This is CRITICAL for robustness
+            current_span_length = np.random.randint(2, 6) 
+            
+            # Pick a random start point
+            if seq_len - current_span_length <= 0: break
+            start = np.random.randint(0, seq_len - current_span_length)
+            
+            # Apply mask if not already masked
+            if not np.any(mask[start : start + current_span_length]):
+                mask[start : start + current_span_length] = True
+                masked_count += current_span_length
+        
+        # Don't mask special tokens (0=Pad, 1=EOS)
         special_tokens_mask = [
             1 if token in [tokenizer.pad_token_id, tokenizer.eos_token_id] else 0 
             for token in seq
         ]
+        mask = mask & (np.array(special_tokens_mask) == 0)
         
-        # Random probability matrix
-        probability_matrix = np.random.rand(*seq_arr.shape)
-        # Mask where prob < 0.25 AND token is not special
-        masked_indices = (probability_matrix < MASK_PROBABILITY) & (np.array(special_tokens_mask) == 0)
-        
-        seq_arr[masked_indices] = mask_token_id
+        # Apply mask
+        seq_arr[mask] = mask_token_id
         masked_input_ids.append(seq_arr.tolist())
 
-        # Update labels: replace padding in labels with -100 so loss ignores them
-        labels[i] = [
-            (l if l != tokenizer.pad_token_id else -100) for l in labels[i]
-        ]
+        # Update labels (ignore padding)
+        labels[i] = [(l if l != tokenizer.pad_token_id else -100) for l in labels[i]]
 
     model_inputs["input_ids"] = masked_input_ids
     model_inputs["labels"] = labels
-    
     return model_inputs
 
 # --- MAIN EXECUTION ---
@@ -146,19 +159,20 @@ if __name__ == "__main__":
     )
 
     # Training Args
-    output_path = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/simplified-BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned"
+    output_path = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned"
     
     args = Seq2SeqTrainingArguments(
         output_dir=output_path,
         overwrite_output_dir=True,
         learning_rate=2e-4, 
-        per_device_train_batch_size=4,
-        per_device_eval_batch_size=4,
-        gradient_accumulation_steps=8,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
+        gradient_accumulation_steps=4,
         weight_decay=0.01,
-        num_train_epochs=5,
+        num_train_epochs=30,
         predict_with_generate=True,
         save_strategy="epoch",
+        save_total_limit=2,
         logging_steps=50,
         fp16=False, # Set to False if you don't have a GPU
         report_to="none",
