@@ -89,8 +89,8 @@ Processing sample 4100...
 Processing sample 4150...
 Processing sample 4200...
 Processing sample 4250...
-Validation Mean Stats -> Mean: -0.0548, Min: -2.0163
-Selected Threshold (2th percentile of Mean scores): -0.6112
+Validation Mean Stats -> Mean: -4.1833, Min: -16.1669
+Selected Threshold (2th percentile of Mean scores): -8.4170
 
 --- Evaluating Test Set ---
 Scoring 4720 sequences using Sliding Window Masking...
@@ -193,15 +193,15 @@ Processing sample 4700...
 Classification Report:
               precision    recall  f1-score   support
 
-      Benign       0.86      0.07      0.14      2932
-      Attack       0.39      0.98      0.56      1788
+      Benign       0.80      0.97      0.88      2929
+      Attack       0.93      0.61      0.74      1791
 
-    accuracy                           0.42      4720
-   macro avg       0.63      0.53      0.35      4720
-weighted avg       0.69      0.42      0.30      4720
+    accuracy                           0.83      4720
+   macro avg       0.87      0.79      0.81      4720
+weighted avg       0.85      0.83      0.83      4720
 
 Confusion Matrix:
-TP: 1754 | FN: 34
-FP: 2715 | TN: 217
-ROC AUC (on Mean): 0.7084
+TP: 1094 | FN: 697
+FP: 83 | TN: 2846
+ROC AUC (on Min): 0.8177
 Done. Results saved to /home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_sliding_window.csv

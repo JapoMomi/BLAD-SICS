@@ -183,14 +183,14 @@ if __name__ == "__main__":
     print("\n--- Calculating Validation Threshold ---")
     val_results = get_anomaly_scores(model, val_dataset, device, tokenizer)
     
-    # We use the MEAN score to determine the threshold (consistent with previous logic)
-    val_scores_mean = val_results["median"]
+    # --- Correct Variable Name ---
+    val_scores_min = val_results["min"] 
     
-    # Threshold = 2nd percentile (Adjusted for Real Data Noise)
-    prob_threshold = np.percentile(val_scores_mean, 2) 
+    # Threshold = 2nd percentile of MIN scores
+    prob_threshold = np.percentile(val_scores_min, 2) 
 
-    print(f"Validation Mean Stats -> Mean: {val_scores_mean.mean():.4f}, Min: {val_scores_mean.min():.4f}")
-    print(f"Selected Threshold (2th percentile of Mean scores): {prob_threshold:.4f}")
+    print(f"Validation Stats -> Mean: {val_scores_min.mean():.4f}, Min: {val_scores_min.min():.4f}")
+    print(f"Selected Threshold (2nd percentile of Min scores): {prob_threshold:.4f}")
 
     # 2. Test Scores
     print("\n--- Evaluating Test Set ---")
@@ -201,8 +201,8 @@ if __name__ == "__main__":
     test_mins = test_results["min"]
     test_median = test_results["median"]
     
-    # 3. Predict (Using the Mean score vs Threshold)
-    predictions = (test_means < prob_threshold).astype(int)
+    # 3. Predict (Using the Min score vs Threshold)
+    predictions = (test_mins < prob_threshold).astype(int)
     
     # 4. Metrics
     print("\nClassification Report:")
@@ -211,7 +211,8 @@ if __name__ == "__main__":
     cm = confusion_matrix(test_labels, predictions)
     print(f"Confusion Matrix:\nTP: {cm[1][1]} | FN: {cm[1][0]}\nFP: {cm[0][1]} | TN: {cm[0][0]}")
 
-    print(f"ROC AUC (on Mean): {roc_auc_score(test_labels, -test_means):.4f}")
+    # --- Compute AUC on MIN scores ---
+    print(f"ROC AUC (on Min): {roc_auc_score(test_labels, -test_mins):.4f}")
 
     # Save Results CSV with MIN, MEAN, MAX
     results_df = pd.DataFrame({
