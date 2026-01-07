@@ -18,9 +18,9 @@ valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/validation
 
 MASK_PROB = 0.15  
 # Hyperparameters
-SEQUENCE_LENGTH = 5         # Number of packets per sequence
+SEQUENCE_LENGTH = 1         # Number of packets per sequence
 SEPARATOR = " "             # Space separator for byte-level model
-MAX_TOKEN_LENGTH = 512     # Fixed length (must match detection)
+MAX_TOKEN_LENGTH = 128     # Fixed length (must match detection)
 
 COLUMN_NAMES = ["packet", "type_1", "type_2", "src", "dst", "timestamp"]
 
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     )
 
     # Training Args
-    output_path = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned"
+    output_path = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/BYTES_modbus-single_packet-finetuned"
     
     args = Seq2SeqTrainingArguments(
         output_dir=output_path,
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         per_device_eval_batch_size=8,
         gradient_accumulation_steps=4,
         weight_decay=0.01,
-        num_train_epochs=30,
+        num_train_epochs=15,
         predict_with_generate=True,
         save_strategy="epoch",
         save_total_limit=2,

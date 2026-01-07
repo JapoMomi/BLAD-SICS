@@ -7,11 +7,11 @@ from sklearn.metrics import classification_report, roc_auc_score, confusion_matr
 import os
 
 # --- 1. CONFIGURATION ---
-SEQUENCE_LENGTH = 5        
-MAX_LENGTH = 512         
+SEQUENCE_LENGTH = 1        
+MAX_LENGTH = 128         
 PACKET_SEPARATOR = ' '      
 # UPDATE THIS PATH to point to the model created by training.py
-MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned" 
+MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/BYTES_modbus-single_packet-finetuned" 
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/validation.txt"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/test.txt"
 
