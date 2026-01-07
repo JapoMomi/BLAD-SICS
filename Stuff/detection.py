@@ -120,7 +120,7 @@ def get_anomaly_scores(model, dataset, device, tokenizer):
             
             # Window Setup
             window_size = 5  # Size of mask
-            stride = 2       # Step size
+            stride = 1       # Step size (=1 scans every byte of the sequence) -> detection is slower
             
             chunk_scores = []
             
