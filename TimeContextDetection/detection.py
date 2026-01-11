@@ -133,13 +133,15 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
     # Convertiamo in Pandas Series per comodità
     scores_series = pd.Series(final_scores)
     # Rolling mean (finestra 3). Il 'min_periods=1' serve per non perdere i primi dati.
-    smoothed_scores = scores_series.rolling(window=2, min_periods=1).mean().values
+    #smoothed_scores = scores_series.rolling(window=2, min_periods=1).mean().values
+    # span=3 simula una finestra di circa 3, ma con peso esponenziale
+    smoothed_scores = scores_series.ewm(span=2, adjust=False).mean().values
     # Sovrascriviamo final_scores con la versione "pulita"
     final_scores = smoothed_scores
 
     if threshold is None:
         # Threshold calculation on Validation
-        calc_threshold = np.percentile(final_scores, 1)
+        calc_threshold = np.percentile(final_scores, 10)
         print(f"Validation Stats -> Mean: {final_scores.mean():.4f}, Min: {final_scores.min():.4f}")
         print(f"Calculated Threshold: {calc_threshold:.4f}")
         return calc_threshold
