@@ -2,8 +2,8 @@ Loading Model from /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection
 
 --- Starting Phase: Validation ---
 Processing 32183 sequences...
-Validation Stats -> Mean: -0.4066, Min: -3.7964
-Calculated Threshold: -1.7577
+Validation Stats -> Mean: -0.4066, Min: -3.6921
+Calculated Threshold: -1.6114
 
 --- Starting Phase: Test ---
 Processing 38187 sequences...
@@ -11,14 +11,14 @@ Processing 38187 sequences...
 Classification Report:
               precision    recall  f1-score   support
 
-      Benign       0.86      0.96      0.91     29238
-      Attack       0.79      0.50      0.61      8949
+      Benign       0.87      0.96      0.91     29238
+      Attack       0.80      0.52      0.63      8949
 
-    accuracy                           0.85     38187
-   macro avg       0.82      0.73      0.76     38187
-weighted avg       0.84      0.85      0.84     38187
+    accuracy                           0.86     38187
+   macro avg       0.84      0.74      0.77     38187
+weighted avg       0.85      0.86      0.85     38187
 
 Confusion Matrix:
-TP: 4442 | FN: 4507
-FP: 1208 | TN: 28030
-ROC AUC: 0.8945
+TP: 4697 | FN: 4252
+FP: 1160 | TN: 28078
+ROC AUC: 0.9058

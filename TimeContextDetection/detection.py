@@ -133,7 +133,7 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
     # Convertiamo in Pandas Series per comodità
     scores_series = pd.Series(final_scores)
     # Rolling mean (finestra 3). Il 'min_periods=1' serve per non perdere i primi dati.
-    smoothed_scores = scores_series.rolling(window=3, min_periods=1).mean().values
+    smoothed_scores = scores_series.rolling(window=2, min_periods=1).mean().values
     # Sovrascriviamo final_scores con la versione "pulita"
     final_scores = smoothed_scores
 
