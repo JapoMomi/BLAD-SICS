@@ -27,9 +27,20 @@ def evaluate_sequence_leave_one_out(model, tokenizer, sequence_str, device):
     """
     Leave-One-Out Evaluation using Log Probabilities (NOT Loss).
     """
-    decoded_seq = hex_to_latin1(sequence_str)
-    packets = decoded_seq.split(SEPARATOR)
+    # Splittiamo la stringa HEX originale (qui lo spazio è solo il separatore)
+    hex_packets = sequence_str.strip().split(SEPARATOR)
+    # Decodifichiamo ogni pacchetto singolarmente
+    packets = []
+    for h_pack in hex_packets:
+        try:
+            # Converte da hex a bytes e poi a stringa latin-1
+            dec_p = bytes.fromhex(h_pack).decode('latin-1')
+            packets.append(dec_p)
+        except ValueError:
+            # Fallback se c'è sporcizia (es. virgole o newline residui)
+            packets.append(h_pack)
     
+    # --- CHECK 1: Lunghezza Errata (Causa più probabile dei -100) ---
     if len(packets) != SEQUENCE_LENGTH:
         return -100.0, [-100.0] * SEQUENCE_LENGTH
 
@@ -86,7 +97,10 @@ def evaluate_sequence_leave_one_out(model, tokenizer, sequence_str, device):
             
             individual_scores.append(score)
 
+    # Media
     avg_score = np.mean(individual_scores)
+    # Min
+    #min_score = np.min(individual_scores)
     return avg_score, individual_scores
 
 def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, threshold=None):
@@ -113,9 +127,19 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
         
     final_scores = np.array(final_scores)
     
+    # --- TEMPORAL SMOOTHING ---
+    # Facciamo una media mobile su una finestra di 3 sequenze.
+    # Questo riduce il rumore (Falsi Positivi isolati) e evidenzia gli attacchi persistenti.
+    # Convertiamo in Pandas Series per comodità
+    scores_series = pd.Series(final_scores)
+    # Rolling mean (finestra 3). Il 'min_periods=1' serve per non perdere i primi dati.
+    smoothed_scores = scores_series.rolling(window=5, min_periods=1).mean().values
+    # Sovrascriviamo final_scores con la versione "pulita"
+    final_scores = smoothed_scores
+
     if threshold is None:
         # Threshold calculation on Validation
-        calc_threshold = np.percentile(final_scores, 2)
+        calc_threshold = np.percentile(final_scores, 1)
         print(f"Validation Stats -> Mean: {final_scores.mean():.4f}, Min: {final_scores.min():.4f}")
         print(f"Calculated Threshold: {calc_threshold:.4f}")
         return calc_threshold
