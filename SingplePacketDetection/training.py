@@ -170,7 +170,7 @@ if __name__ == "__main__":
     )
 
     # Training Args
-    output_path = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/BYTES_modbus-single_packet-finetuned"
+    output_path = f"/home/spritz/storage/disk0/Master_Thesis/SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned"
     
     args = Seq2SeqTrainingArguments(
         output_dir=output_path,

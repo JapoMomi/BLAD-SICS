@@ -141,7 +141,7 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
 
     if threshold is None:
         # Threshold calculation on Validation
-        calc_threshold = np.percentile(final_scores, 10)
+        calc_threshold = np.percentile(final_scores, 15)
         print(f"Validation Stats -> Mean: {final_scores.mean():.4f}, Min: {final_scores.min():.4f}")
         print(f"Calculated Threshold: {calc_threshold:.4f}")
         return calc_threshold

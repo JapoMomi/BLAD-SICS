@@ -16,9 +16,9 @@ model_checkpoint = "google/byt5-small"
 train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/train.txt"
 valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt"
 
-SEQUENCE_LENGTH = 5         
+SEQUENCE_LENGTH = 1         
 SEPARATOR = " "             
-MAX_TOKEN_LENGTH = 512     
+MAX_TOKEN_LENGTH = 128     
 
 COLUMN_NAMES = ["packet", "label"]
 
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         remove_columns=COLUMN_NAMES 
     )
 
-    output_path = f"/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned"
+    output_path = f"/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-single_packet-finetuned"
     
     args = Seq2SeqTrainingArguments(
         output_dir=output_path,

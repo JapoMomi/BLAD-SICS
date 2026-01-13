@@ -11,7 +11,7 @@ SEQUENCE_LENGTH = 1
 MAX_LENGTH = 128         
 PACKET_SEPARATOR = ' '      
 # UPDATE THIS PATH to point to the model created by training.py
-MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/Stuff/Byt5/BYTES_modbus-single_packet-finetuned" 
+MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned" 
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/validation.txt"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/test.txt"
 
@@ -223,6 +223,6 @@ if __name__ == "__main__":
         'Score_Median': test_median
     })
     
-    output_csv_path = "/home/spritz/storage/disk0/Master_Thesis/Stuff/detection_results_sliding_window.csv"
+    output_csv_path = "/home/spritz/storage/disk0/Master_Thesis/SingplePacketDetection/detection_results_sliding_window.csv"
     results_df.to_csv(output_csv_path, index=False)
     print(f"Done. Results saved to {output_csv_path}")

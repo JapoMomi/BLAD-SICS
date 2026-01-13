@@ -10,3 +10,5 @@ ByT5/ByT5-project-sequences/byt5_seq_5_normalTraffic
 
 TimeContextDetection/Byt5/BYTES_modbus-sequence_5-finetuned/checkpoint-70410
 TimeContextDetection/Byt5/BYTES_modbus-sequence_5-finetuned/checkpoint-65716
+SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned/checkpoint-75110
+SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned/checkpoint-80475
