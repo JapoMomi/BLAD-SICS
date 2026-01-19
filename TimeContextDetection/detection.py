@@ -10,7 +10,7 @@ SEQUENCE_LENGTH = 5
 MAX_LENGTH = 512
 SEPARATOR = ' '
 
-MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_{SEQUENCE_LENGTH}-finetuned"
+MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_{SEQUENCE_LENGTH}_ALLMasked-finetuned"
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt"
 
@@ -135,7 +135,7 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
     # Rolling mean (finestra 3). Il 'min_periods=1' serve per non perdere i primi dati.
     #smoothed_scores = scores_series.rolling(window=2, min_periods=1).mean().values
     # span=3 simula una finestra di circa 3, ma con peso esponenziale
-    smoothed_scores = scores_series.ewm(span=2, adjust=False).mean().values
+    smoothed_scores = scores_series.ewm(span=3, adjust=False).mean().values
     # Sovrascriviamo final_scores con la versione "pulita"
     final_scores = smoothed_scores
 
