@@ -4,106 +4,183 @@ from sklearn.metrics import classification_report, confusion_matrix, f1_score
 
 # --- CONFIGURAZIONE ---
 INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/detection_detailed_results.csv"
+OUTPUT_THRESHOLDS_FILE = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/best_thresholds_found.txt"
 
-# Vuoi ottimizzare per F1-Score (bilanciato) o Recall (prendere tutti gli attacchi)?
-# "f1" = Bilanciato (Consigliato)
-# "recall" = Minimizzare i Falsi Negativi (rischio di più Falsi Positivi)
-OPTIMIZATION_TARGET = "f1" 
-
-def analyze_hybrid_thresholds():
-    print(f"--- Loading results from {INPUT_FILE} ---")
+def load_data():
+    print(f"--- Caricamento risultati da {INPUT_FILE} ---")
     try:
         df = pd.read_csv(INPUT_FILE)
     except FileNotFoundError:
-        print("Errore: File non trovato. Esegui prima lo script di detection!")
-        return
+        print("❌ Errore: File non trovato.")
+        return None
 
-    y_true = df['Label'].values
-    
-    # 1. Assicuriamoci di avere Avg_Score e Min_Score
-    # Avg_Score c'è sicuro. Calcoliamo il MINIMO dai pacchetti se non c'è.
     if 'Min_Score' not in df.columns:
         score_cols = [c for c in df.columns if c.startswith('Score_P')]
         if score_cols:
-            print("Calcolo colonna 'Min_Score' dai punteggi individuali...")
+            print("⚠️ Colonna 'Min_Score' mancante. Calcolo al volo...")
             df['Min_Score'] = df[score_cols].min(axis=1)
         else:
-            print("ERRORE: Colonne Score_P... non trovate. Impossibile calcolare il Minimo.")
-            return
+            print("❌ Errore: Impossibile calcolare Min_Score.")
+            return None
+    return df
 
-    avg_scores = df['Avg_Score'].values
-    min_scores = df['Min_Score'].values
-
-    print(f"\n--- Avvio Grid Search Ibrida (Target: {OPTIMIZATION_TARGET.upper()}) ---")
-    print("Cerchiamo la combinazione migliore: (Avg < T1) OR (Min < T2)")
-    
-    # 2. Definiamo lo spazio di ricerca (Grid) basato sui dati reali
-    # Usiamo i percentili per non cercare valori impossibili.
-    # Avg: Cerchiamo tra il valore minimo e il 30esimo percentile (zona di confine attacchi)
-    avg_candidates = np.unique(np.percentile(avg_scores, np.linspace(0.1, 40, 50)))
-    # Min: Cerchiamo tra il valore minimo e il 20esimo percentile
-    min_candidates = np.unique(np.percentile(min_scores, np.linspace(0.1, 30, 50)))
-    
-    best_score = -1
-    best_avg_thresh = 0
-    best_min_thresh = 0
-    
-    total_combinations = len(avg_candidates) * len(min_candidates)
-    print(f"Testando {total_combinations} combinazioni di soglie...")
-
-    # 3. Grid Search Loop
-    for t_avg in avg_candidates:
-        for t_min in min_candidates:
-            
-            # LOGICA IBRIDA: Allarme se Media bassa OPPURE Minimo basso
-            # Nota: Minimo basso cattura gli attacchi "cecchino" (1 pacchetto su 5)
-            y_pred = ((avg_scores < t_avg) | (min_scores < t_min)).astype(int)
-            
-            if OPTIMIZATION_TARGET == "f1":
-                # F1 Score sulla classe 1 (Attacco)
-                score = f1_score(y_true, y_pred, pos_label=1)
-            else:
-                # Recall sulla classe 1
-                cm = confusion_matrix(y_true, y_pred)
-                tn, fp, fn, tp = cm.ravel()
-                score = tp / (tp + fn) if (tp + fn) > 0 else 0
-                # Penalità se FPR esplode (opzionale, per sicurezza)
-                if (fp / (fp+tn)) > 0.3: score = 0 
-
-            if score > best_score:
-                best_score = score
-                best_avg_thresh = t_avg
-                best_min_thresh = t_min
-
-    print("-" * 50)
-    print(f"VINCITORE TROVATO!")
-    print(f"Best {OPTIMIZATION_TARGET.upper()}: {best_score:.4f}")
-    print(f"Soglia Avg: {best_avg_thresh:.4f}")
-    print(f"Soglia Min: {best_min_thresh:.4f}")
-    print("-" * 50)
-
-    # 4. Report Dettagliato sul Vincitore
-    print(f"\n--- Simulazione Finale con Soglie Ottimali ---")
-    
-    final_pred = ((avg_scores < best_avg_thresh) | (min_scores < best_min_thresh)).astype(int)
-    
-    print(classification_report(y_true, final_pred, target_names=["Benign", "Attack"]))
-    
-    cm = confusion_matrix(y_true, final_pred)
+def calculate_metrics(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
     tn, fp, fn, tp = cm.ravel()
     
-    print(f"Confusion Matrix:")
-    print(f"TP (Attacchi Presi):    {tp} | FN (Attacchi Persi):    {fn}")
-    print(f"FP (Falsi Allarmi):     {fp} | TN (Benigni OK):        {tn}")
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
     
-    fpr_rate = fp / (fp + tn) if (fp + tn) > 0 else 0
-    print(f"\nFalse Positive Rate (FPR): {fpr_rate*100:.2f}%")
+    return {
+        "tp": tp, "tn": tn, "fp": fp, "fn": fn,
+        "f1": f1, "recall": recall, "precision": precision, 
+        "fpr": fpr, "specificity": specificity
+    }
+
+def print_strategy_header(name, thresholds=None):
+    print(f"\n{'='*80}")
+    print(f"STRATEGIA: {name.upper()}")
+    if thresholds:
+        print(f"Soglie Trovate -> Avg: {thresholds[0]:.4f} | Min: {thresholds[1]:.4f}")
+    print(f"{'-'*80}")
+
+def run_optimization():
+    df = load_data()
+    if df is None: return
+
+    y_true = df['Label'].values
+    avg_scores = df['Avg_Score'].values
+    min_scores = df['Min_Score'].values
     
-    # 5. Salvataggio soglie su file per uso futuro
-    with open("/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/best_thresholds_found.txt", "w") as f:
-        f.write(f"AVG_THRESH={best_avg_thresh}\n")
-        f.write(f"MIN_THRESH={best_min_thresh}\n")
-    print("\nSoglie salvate in 'best_thresholds_found.txt'")
+    # --- 1. SETUP GRID SEARCH ---
+    avg_candidates = np.unique(np.percentile(avg_scores, np.linspace(0.1, 40, 40)))
+    min_candidates = np.unique(np.percentile(min_scores, np.linspace(0.1, 30, 40)))
+    
+    total_combs = len(avg_candidates) * len(min_candidates)
+    print(f"🔍 Testando {total_combs} combinazioni per 4 strategie diverse...")
+
+    best_results = {
+        "f1_max": {"score": -1, "thresh": (0,0), "preds": None},
+        "roc_best": {"score": -1, "thresh": (0,0), "preds": None}, 
+        "min_fp": {"score": -1, "thresh": (0,0), "preds": None},   
+        "min_fn": {"score": -1, "thresh": (0,0), "preds": None}    
+    }
+
+    # --- 2. GRID SEARCH LOOP ---
+    for t_avg in avg_candidates:
+        for t_min in min_candidates:
+            y_pred = ((avg_scores < t_avg) | (min_scores < t_min)).astype(int)
+            
+            # Calcolo metriche vettoriali
+            tp = np.sum((y_pred == 1) & (y_true == 1))
+            tn = np.sum((y_pred == 0) & (y_true == 0))
+            fp = np.sum((y_pred == 1) & (y_true == 0))
+            fn = np.sum((y_pred == 0) & (y_true == 1))
+            
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+            specificity = 1 - fpr
+            
+            # Strategia 1: Max F1
+            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+            if f1 > best_results["f1_max"]["score"]:
+                best_results["f1_max"]["score"] = f1
+                best_results["f1_max"]["thresh"] = (t_avg, t_min)
+                best_results["f1_max"]["preds"] = y_pred
+
+            # Strategia 2: Max ROC (Youden)
+            youden = recall + specificity - 1
+            if youden > best_results["roc_best"]["score"]:
+                best_results["roc_best"]["score"] = youden
+                best_results["roc_best"]["thresh"] = (t_avg, t_min)
+                best_results["roc_best"]["preds"] = y_pred
+
+            # Strategia 3: Minimize FP (Conservative)
+            # FPR < 0.5%
+            if fpr <= 0.005: 
+                score_conservative = recall
+            else:
+                score_conservative = -1 
+            
+            if score_conservative > best_results["min_fp"]["score"]:
+                best_results["min_fp"]["score"] = score_conservative
+                best_results["min_fp"]["thresh"] = (t_avg, t_min)
+                best_results["min_fp"]["preds"] = y_pred
+
+            # Strategia 4: Minimize FN (Paranoid)
+            score_paranoid = (recall * 10) + precision
+            if score_paranoid > best_results["min_fn"]["score"]:
+                best_results["min_fn"]["score"] = score_paranoid
+                best_results["min_fn"]["thresh"] = (t_avg, t_min)
+                best_results["min_fn"]["preds"] = y_pred
+
+    # --- 3. STAMPA REPORT DETTAGLIATI ---
+    strategies_metrics = {}
+    
+    # Report per la Originale (CSV attuale)
+    if 'Pred' in df.columns:
+        print_strategy_header("Original (Current CSV)", None)
+        # Stampa il Classification Report
+        print(classification_report(y_true, df['Pred'].values, target_names=["Benign", "Attack"]))
+        # Calcola metriche per riassunto finale
+        metrics = calculate_metrics(y_true, df['Pred'].values)
+        strategies_metrics["Original"] = metrics
+        print(f"Confusion Matrix: [TP: {metrics['tp']} | FN: {metrics['fn']}]")
+        print(f"                  [FP: {metrics['fp']} | TN: {metrics['tn']}]")
+
+
+    # Report per le 4 Strategie Ottimizzate
+    for name, res in best_results.items():
+        if res["preds"] is not None:
+            metrics = calculate_metrics(y_true, res["preds"])
+            strategies_metrics[name] = metrics
+            
+            print_strategy_header(name, res["thresh"])
+            
+            # --- QUI STAMPIAMO IL GRAFICO (REPORT) CHE CHIEDEVI ---
+            print(classification_report(y_true, res["preds"], target_names=["Benign", "Attack"]))
+            
+            print(f"Confusion Matrix: [TP: {metrics['tp']} | FN: {metrics['fn']}]")
+            print(f"                  [FP: {metrics['fp']} | TN: {metrics['tn']}]")
+            print(f"Metrics Extra:    FPR: {metrics['fpr']:.2%}")
+
+    # --- 4. CONFRONTO FINALE ---
+    print("\n\n🏆 CONFRONTO FINALE STRATEGIE 🏆")
+    print(f"{'Strategia':<20} | {'F1-Score':<8} | {'Recall':<8} | {'FPR':<8} | {'FP Count':<8} | {'FN Count':<8}")
+    print("-" * 80)
+    
+    best_overall_name = "f1_max"
+    
+    for name, m in strategies_metrics.items():
+        print(f"{name:<20} | {m['f1']:.4f}   | {m['recall']:.4f}   | {m['fpr']:.2%}   | {m['fp']:<8} | {m['fn']:<8}")
+
+    print("-" * 80)
+    
+    rec = strategies_metrics.get("min_fp")
+    f1_rec = strategies_metrics.get("f1_max")
+    
+    print("\n💡 RACCOMANDAZIONE:")
+    if rec and rec['recall'] > 0.85:
+        print("✅ VINCITORE: 'MIN_FP' (Conservative).")
+        print("   Motivo: Offre una Recall eccellente (>85%) con Falsi Allarmi quasi nulli.")
+        best_overall_name = "min_fp"
+    elif f1_rec:
+        print("✅ VINCITORE: 'F1_MAX' (Balanced).")
+        print("   Motivo: Miglior compromesso matematico.")
+        best_overall_name = "f1_max"
+        
+    winner = best_results.get(best_overall_name)
+    if winner:
+        t_avg, t_min = winner["thresh"]
+        with open(OUTPUT_THRESHOLDS_FILE, "w") as f:
+            f.write(f"AVG_THRESH={t_avg}\n")
+            f.write(f"MIN_THRESH={t_min}\n")
+            f.write(f"STRATEGY={best_overall_name}\n")
+        print(f"\n💾 Soglie della strategia vincente ({best_overall_name}) salvate in: {OUTPUT_THRESHOLDS_FILE}")
 
 if __name__ == "__main__":
-    analyze_hybrid_thresholds()
+    run_optimization()
