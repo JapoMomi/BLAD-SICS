@@ -1,26 +1,6 @@
-Loading Model from /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned...
-
---- Starting Phase: Validation ---
-Processing 32183 sequences...
-
-🔍 Avvio Grid Search per le soglie ottimali...
-✅ Trovate soglie ottimali (F1 Validation: 0.0000)
-   -> Avg Threshold: -1.0055
-   -> Min Threshold: -3.8682
-
---- Starting Phase: Test ---
-Processing 38187 sequences...
-
-Classification Report (Hybrid + Persistence):
-              precision    recall  f1-score   support
-
-      Benign       0.90      1.00      0.95     29238
-      Attack       1.00      0.64      0.78      8949
-
-    accuracy                           0.92     38187
-   macro avg       0.95      0.82      0.86     38187
-weighted avg       0.92      0.92      0.91     38187
-
-Confusion Matrix:
-TP: 5751 | FN: 3198
-FP: 19 | TN: 29219
+Caricamento modello da /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned su cuda...
+Lettura dataset da /home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt...
+Inizio Detection con Sliding Window Accumulation...
+Creazione CSV aggregato...
+✅ Analisi completata. Risultati salvati in: /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/detection_sliding_results.csv
+   Totale pacchetti unici analizzati: 38191
