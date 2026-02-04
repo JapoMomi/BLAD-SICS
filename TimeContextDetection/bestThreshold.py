@@ -3,10 +3,11 @@ import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix
 
 # --- CONFIGURAZIONE ---
-INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/detection_raw_logprobs.csv"
+# Inserisci qui il percorso del file CSV appena generato da detection.py
+INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/detection_topK_final.csv"
 
 def print_custom_report(y_true, y_pred, title):
-    """Funzione di servizio per stampare a schermo i risultati formattati"""
+    """Stampa il report formattato con Precision, Recall, F1 e Confusion Matrix"""
     report_dict = classification_report(y_true, y_pred, output_dict=True)
     cm = confusion_matrix(y_true, y_pred)
     tn, fp, fn, tp = cm.ravel()
@@ -17,66 +18,46 @@ def print_custom_report(y_true, y_pred, title):
     print(f"{'':<14} {'precision':>9} {'recall':>9} {'f1-score':>9} {'support':>9}")
     r0 = report_dict['0']
     r1 = report_dict['1']
-    print(f"{'Benign':<14} {r0['precision']:>9.2f} {r0['recall']:>9.2f} {r0['f1-score']:>9.2f} {r0['support']:>9}")
-    print(f"{'Attack':<14} {r1['precision']:>9.2f} {r1['recall']:>9.2f} {r1['f1-score']:>9.2f} {r1['support']:>9}")
-    print(f"\nConfusion Matrix: [TP: {tp} | FN: {fn}]")
-    print(f"                  [FP: {fp} | TN: {tn}]")
+    print(f"{'Benign':<14} {r0['precision']:>9.4f} {r0['recall']:>9.4f} {r0['f1-score']:>9.4f} {r0['support']:>9}")
+    print(f"{'Attack':<14} {r1['precision']:>9.4f} {r1['recall']:>9.4f} {r1['f1-score']:>9.4f} {r1['support']:>9}")
+    print(f"\nConfusion Matrix:\n[TP: {tp:<5} | FN: {fn:<5}]\n[FP: {fp:<5} | TN: {tn:<5}]")
     return r1['f1-score']
 
 def run_voting_strategy(df, strategy_name):
-    """
-    Trova la soglia migliore per una specifica strategia di voting (es. majority).
-    """
+    """Cerca la soglia che massimizza l'F1-Score per la strategia specificata"""
     y_true = df['True_Label'].values
     
-    # Seleziona le 5 colonne contenenti le log-probabilità
+    # Seleziona solo le colonne con le probabilità (ignoriamo Voting_Pred che era quella vecchia)
     score_cols = [f'LogProb_Pos{i}' for i in range(5)]
     scores = df[score_cols]
     
-    # Raccoglie tutti i punteggi validi per definire il range di ricerca della soglia
     vals = scores.values.flatten()
     vals = vals[~np.isnan(vals)]
     
-    # Genera 100 possibili soglie: dal percentile 1 (valori molto negativi) 
-    # al percentile 99 (valori vicini allo zero)
+    # Generiamo 100 possibili soglie basate sulla distribuzione dei dati Top-K
     thresholds = np.linspace(np.percentile(vals, 1), np.percentile(vals, 99), 100)
     
-    best_f1 = -1
-    best_th = None
-    best_preds = None
+    best_f1, best_th, best_preds = -1, None, None
     
-    # Per ogni possibile soglia, simuliamo cosa accadrebbe
     for th in thresholds:
-        # CONDIZIONE DI ANOMALIA: 
-        # Siccome lavoriamo con log-probabilità negative, un pacchetto è anomalo
-        # se la sua probabilità è MINORE della soglia (cioè è molto improbabile).
+        # CONDIZIONE DI ANOMALIA: LogProb < Soglia
         is_anomalous = scores < th 
         
-        # --- APPLICAZIONE DELLE STRATEGIE DI VOTING ---
-        
+        # --- LOGICHE DI VOTING ---
         if strategy_name == 'majority':
-            # Majority Voting:
-            # exceeds.sum(axis=1) -> Conta quante volte su 5 il pacchetto è anomalo.
-            # scores.notna().sum(axis=1) / 2 -> Calcola la metà dei test validi (es. 2.5 su 5).
-            # Se i voti anomali superano la maggioranza, etichettiamo come 1 (Attacco).
             vote = (is_anomalous.sum(axis=1) > (scores.notna().sum(axis=1) / 2)).astype(int)
-            
         elif strategy_name == 'at_least_1':
-            # At Least 1:
-            # is_anomalous.any(axis=1) -> Ritorna True se c'è ALMENO UN test anomalo sui 5.
             vote = is_anomalous.any(axis=1).astype(int)
-            
+        elif strategy_name == 'at_least_2':
+            vote = (is_anomalous.sum(axis=1) >= 2).astype(int)
         elif strategy_name == 'strict_all':
-            # Strict (Unanimità):
-            # Conta se il numero di test falliti è UGUALE al numero totale di test validi.
             all_match = (is_anomalous.sum(axis=1) == scores.notna().sum(axis=1))
-            has_data = scores.notna().sum(axis=1) > 0 # Evita di votare su pacchetti senza dati
+            has_data = scores.notna().sum(axis=1) > 0
             vote = (all_match & has_data).astype(int)
         
-        # Calcoliamo l'F1-Score ottenuto con questa soglia temporanea
+        # Calcolo F1
         f1 = classification_report(y_true, vote, output_dict=True)['1']['f1-score']
         
-        # Se questo risultato è migliore del precedente, lo salviamo come il "nuovo migliore"
         if f1 > best_f1:
             best_f1 = f1
             best_th = th
@@ -85,37 +66,33 @@ def run_voting_strategy(df, strategy_name):
     return best_f1, best_th, best_preds
 
 def main():
-    print(f"Caricamento dati da {INPUT_FILE}...")
+    print(f"Caricamento dati (Metrica Top-3) da {INPUT_FILE}...")
     try:
         df = pd.read_csv(INPUT_FILE)
-    except:
-        print("❌ File non trovato. Esegui prima detection.py")
+    except FileNotFoundError:
+        print("❌ File non trovato. Verifica il percorso.")
         return
 
-    print("\n🔍 RICERCA BEST THRESHOLD (Utilizzo Log-Likelihood Negativa)")
+    print("\n🔍 RICERCA BEST THRESHOLD PER STRATEGIA (Senza rifare inferenza!)")
     
-    # Lista delle strategie da testare
-    strategies = ['majority', 'at_least_1', 'strict_all']
+    strategies = ['majority', 'at_least_1', 'at_least_2', 'strict_all']
     results = {}
 
-    # Eseguiamo la ricerca per ogni strategia
     for strat in strategies:
         f1, th, preds = run_voting_strategy(df, strat)
         results[strat] = {'f1': f1, 'th': th, 'preds': preds}
-        print(f"Strategia {strat.upper():<12} -> Miglior F1: {f1:.3f} (con Soglia: {th:.4f})")
+        print(f"Strategia {strat.upper():<12} -> Miglior F1: {f1:.4f} (Soglia Ottimale: {th:.4f})")
 
-    # Identifichiamo la strategia che ha ottenuto l'F1-Score più alto in assoluto
     best_strat = max(results, key=lambda k: results[k]['f1'])
     
-    # Stampiamo i report dettagliati per tutte le strategie testate
     print("\n" + "#"*60)
-    print(" RISULTATI DETTAGLIATI DELLE STRATEGIE DI VOTING ")
+    print(" RISULTATI DETTAGLIATI ")
     print("#"*60)
 
     for strat in strategies:
-        print_custom_report(df['True_Label'], results[strat]['preds'], f"RISULTATI STRATEGIA: {strat.upper()} (Soglia: {results[strat]['th']:.4f})")
+        print_custom_report(df['True_Label'], results[strat]['preds'], f"STRATEGIA: {strat.upper()} (Soglia: {results[strat]['th']:.4f})")
 
-    print(f"\n🏆 VINCITORE: {best_strat.upper()} (F1-Score: {results[best_strat]['f1']:.3f})")
+    print(f"\n🏆 VINCITORE ASSOLUTO: {best_strat.upper()} con F1-Score: {results[best_strat]['f1']:.4f}")
 
 if __name__ == "__main__":
     main()

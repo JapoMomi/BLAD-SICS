@@ -1,5 +1,24 @@
 Caricamento modello su cuda...
 Lettura dataset da /home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt...
-Estrazione probabilità raw con Sliding Window...
-Creazione CSV finale...
-✅ Analisi completata. Salvato in: /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/detection_raw_logprobs.csv
+Fase 1: Inferenza modello e calcolo probabilità...
+
+Fase 2: Calcolo Predizioni e Salvataggio Report...
+
+🔍 Ricerca della soglia ottimale per strategia 'MAJORITY'...
+✅ Dati completi salvati in: /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/detection_final_with_preds.csv
+
+============================================================
+RISULTATO FINALE (Strategia: MAJORITY | Soglia: -1.9367)
+============================================================
+              precision    recall  f1-score   support
+
+           0     0.9058    0.9580    0.9312     32113
+           1     0.8135    0.6479    0.7213      9082
+
+    accuracy                         0.8896     41195
+   macro avg     0.8597    0.8029    0.8262     41195
+weighted avg     0.8855    0.8896    0.8849     41195
+
+Confusion Matrix:
+[TP: 5884  | FN: 3198 ]
+[FP: 1349  | TN: 30764]

@@ -1,58 +1,85 @@
 import pandas as pd
 import numpy as np
 
-# --- CONFIGURAZIONE PERCORSI ---
-# Assicurati che il nome del file coincida con quello generato dal tuo script di detection
-INPUT_CSV = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/detection_detailed_results.csv"
-OUTPUT_CSV = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/analysis_false_negatives.csv"
+# --- CONFIGURAZIONE ---
+INPUT_CSV = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/detection_final_with_preds.csv"
+OUTPUT_FN_CSV = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/false_negatives_analysis.csv"
 
-def analyze_false_negatives():
-    print(f"--- Caricamento risultati da: {INPUT_CSV} ---")
-    
+# INSERISCI QUI LA SOGLIA CHE HA VINTO NELLO SCRIPT PRECEDENTE!
+# Esempio: se il report diceva "Soglia: -2.4668", metti -2.4668
+THRESHOLD_USED = -2.1666 
+
+def main():
+    print(f"Caricamento dati da {INPUT_CSV}...")
     try:
-        # Carica il dataset
         df = pd.read_csv(INPUT_CSV)
     except FileNotFoundError:
-        print(f"❌ Errore: Il file {INPUT_CSV} non è stato trovato.")
+        print("❌ File non trovato.")
         return
 
-    # --- FILTRO ---
-    # Label == 1 (È un Attacco)
-    # Pred == 0  (Il modello ha detto Benigno)
-    fn_df = df[(df['Label'] == 1) & (df['Pred'] == 0)].copy()
-    
-    count_total = len(df)
-    count_fn = len(fn_df)
-    
-    print(f"Totale righe nel report: {count_total}")
-    print(f"Falsi Negativi trovati (Label=1, Pred=0): {count_fn}")
-    
-    if count_fn == 0:
-        print("✅ Ottimo! Nessun Falso Negativo trovato.")
+    # 1. Identificazione dei Veri Positivi e Falsi Negativi
+    attacchi_totali = df[df['True_Label'] == 1]
+    tp_df = df[(df['True_Label'] == 1) & (df['Voting_Pred'] == 1)]
+    fn_df = df[(df['True_Label'] == 1) & (df['Voting_Pred'] == 0)].copy()
+
+    num_attacchi = len(attacchi_totali)
+    num_tp = len(tp_df)
+    num_fn = len(fn_df)
+
+    print(f"\n{'='*60}")
+    print(f" RESOCONTO ATTACCHI")
+    print(f"{'='*60}")
+    print(f"Attacchi totali nel dataset: {num_attacchi}")
+    print(f"Rilevati (True Positives):   {num_tp} ({num_tp/num_attacchi:.1%})")
+    print(f"Mancati  (False Negatives):  {num_fn} ({num_fn/num_attacchi:.1%})")
+
+    if num_fn == 0:
+        print("🎉 Nessun Falso Negativo! Il modello è perfetto.")
         return
 
-    # --- ANALISI RAPIDA ---
-    print("\n--- Statistiche degli Score dei Falsi Negativi ---")
-    # Vediamo quanto erano alti i punteggi (ricorda: punteggi alti = sembrano benigni)
-    stats = fn_df['Avg_Score'].describe()
-    print(stats)
+    # 2. Analisi approfondita dei Falsi Negativi
+    score_cols = [f'LogProb_Pos{i}' for i in range(5)]
     
-    # Salvataggio su file
-    print(f"\nSalvataggio delle righe problematiche in: {OUTPUT_CSV}")
-    fn_df.to_csv(OUTPUT_CSV, index=False)
+    # Calcoliamo la media delle log-probabilità per ogni FN
+    fn_df['Avg_LogProb'] = fn_df[score_cols].mean(axis=1)
     
-    # --- ANTEPRIMA ---
-    print("\nEsempio delle prime 5 righe problematiche:")
-    # Mostriamo solo le colonne più utili
-    cols_to_show = ['Label', 'Pred', 'Avg_Score', 'Score_P1', 'Score_P2', 'Score_P3', 'Score_P4', 'Score_P5']
-    # Se esistono nel csv, altrimenti mostra tutto
-    available_cols = [c for c in cols_to_show if c in fn_df.columns]
-    print(fn_df[available_cols].head(5))
+    # Contiamo QUANTE VOLTE il pacchetto è sceso sotto la soglia (cioè quanti voti di anomalia ha preso)
+    # is_anomalous_mask sarà True dove LogProb < THRESHOLD_USED
+    is_anomalous_mask = fn_df[score_cols] < THRESHOLD_USED
+    fn_df['Voti_Anomalia'] = is_anomalous_mask.sum(axis=1)
 
-    print("\n--- SUGGERIMENTO PER L'ANALISI ---")
-    print("Controlla la colonna 'Avg_Score' nel file salvato.")
-    print("1. Se i valori sono VICINI alla soglia (es. -0.70 se la soglia è -0.75), allora bastava poco per prenderli.")
-    print("2. Se i valori sono MOLTO ALTI (es. -0.001), il modello è completamente convinto che siano benigni.")
+    print(f"\n{'='*60}")
+    print(f" ANALISI DEI FALSI NEGATIVI (FN)")
+    print(f"{'='*60}")
+
+    # Statistiche sui "Quasi-Rilevati"
+    voti_counts = fn_df['Voti_Anomalia'].value_counts().sort_index()
+    print("Distribuzione dei voti di anomalia tra i FN:")
+    for voti, count in voti_counts.items():
+        print(f" - FN con {voti} voti di anomalia: {count} pacchetti ({count/num_fn:.1%})")
+        if voti == 1:
+            print(f"   (Questi sono 'Quasi-Rilevati': avevano 1 voto ma la strategia ne richiedeva 2!)")
+
+    # Confronto delle medie
+    avg_tp_score = tp_df[score_cols].mean(axis=1).mean()
+    avg_fn_score = fn_df['Avg_LogProb'].mean()
+    print(f"\nLog-Probabilità Media dei Veri Positivi: {avg_tp_score:.4f} (Ben sotto la soglia)")
+    print(f"Log-Probabilità Media dei Falsi Negativi: {avg_fn_score:.4f} (Troppo vicina a 0)")
+
+    # 3. Ordinamento e Salvataggio
+    # Ordiniamo i FN per 'Avg_LogProb' decrescente (dal più vicino a 0 al più negativo)
+    # Quelli in cima alla lista sono quelli che il modello ha scambiato per "Normalissimi"
+    fn_df = fn_df.sort_values(by='Avg_LogProb', ascending=False)
+    
+    # Selezioniamo solo le colonne utili per il CSV di output
+    cols_to_save = ['Packet_ID', 'Voti_Anomalia', 'Avg_LogProb'] + score_cols
+    fn_df[cols_to_save].to_csv(OUTPUT_FN_CSV, index=False)
+
+    print(f"\n✅ Dettaglio completo dei Falsi Negativi salvato in: {OUTPUT_FN_CSV}")
+    print("\n💡 SUGGERIMENTO PER L'ANALISI MANUALE:")
+    print("Apri il file salvato. Troverai due categorie interessanti di FN:")
+    print("1) Quelli con 'Voti_Anomalia' = 1. Il modello ha visto l'anomalia, ma il contesto temporale l'ha mascherata.")
+    print("2) Quelli con 'Avg_LogProb' molto vicina a 0 (es. -0.05). Questi sono attacchi che il modello ha imparato a memoria o che sono indistinguibili dal traffico benigno.")
 
 if __name__ == "__main__":
-    analyze_false_negatives()
+    main()
