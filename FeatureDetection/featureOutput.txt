@@ -1,0 +1,33 @@
+Caricamento ByT5 Encoder da /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned su cuda...
+Lettura /home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/train.txt...
+Lettura /home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt...
+Splitting del Test Set per il training del classificatore...
+
+--- Setup Dataset Finale ---
+TRAIN Set: 170587 samples (Benigni: 160482, Attacchi: 10105)
+EVAL Set:  20596 samples (Benigni: 10490, Attacchi: 10106)
+
+--- Fase 1: Estrazione Embeddings (ByT5) ---
+Inizio estrazione features per 170587 campioni...
+Inizio estrazione features per 20596 campioni...
+Shape Embeddings Train: (170587, 1472)
+
+--- Fase 2: Addestramento Random Forest ---
+Addestramento completato.
+
+--- Fase 3: Valutazione ---
+
+REPORT DI CLASSIFICAZIONE:
+              precision    recall  f1-score   support
+
+           0     0.7114    0.9908    0.8282     10490
+           1     0.9840    0.5828    0.7320     10106
+
+    accuracy                         0.7906     20596
+   macro avg     0.8477    0.7868    0.7801     20596
+weighted avg     0.8452    0.7906    0.7810     20596
+
+Confusion Matrix:
+[TP: 5890  | FN: 4216 ]
+[FP: 96    | TN: 10394]
+Grafico salvato in classifier_separation.png
