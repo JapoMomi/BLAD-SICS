@@ -2,6 +2,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
+from tqdm import tqdm
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 import os
@@ -109,8 +110,8 @@ def get_anomaly_scores(model, dataset, device, tokenizer):
     print(f"Scoring {len(dataset)} sequences using Sliding Window Masking...")
 
     with torch.no_grad():
-        for i, batch in enumerate(dataloader):
-            if i % 50 == 0: print(f"Processing sample {i}...")
+        for i, batch in enumerate(tqdm(dataloader, desc="Scoring sequences")):
+            #if i % 50 == 0: print(f"Processing sample {i}...")
             
             original_input_ids = batch['input_ids'].to(device) # [1, SeqLen]
             labels = batch['labels'].to(device)
