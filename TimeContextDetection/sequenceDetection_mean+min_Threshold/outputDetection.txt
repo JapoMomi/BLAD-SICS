@@ -1,0 +1,76 @@
+--- Loading results from /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results.csv ---
+
+[Ottimizzazione] Cerco la miglior soglia per: Mean Only...
+
+--- 1. SOLO MEAN (Avg_Score) ---
+              precision    recall  f1-score   support
+
+      Benign       0.84      0.92      0.88     20980
+      Attack       0.91      0.82      0.86     20211
+
+    accuracy                           0.87     41191
+   macro avg       0.88      0.87      0.87     41191
+weighted avg       0.88      0.87      0.87     41191
+
+Confusion Matrix:
+TP:    16657 | FN:    3554
+FP:     1655 | TN:        19325
+AUC: 0.9302
+#######################################################################################
+
+[Ottimizzazione] Cerco la miglior soglia per: Min Only...
+
+--- 2. SOLO MIN (Min_Score) ---
+              precision    recall  f1-score   support
+
+      Benign       0.78      0.77      0.78     20980
+      Attack       0.77      0.78      0.77     20211
+
+    accuracy                           0.77     41191
+   macro avg       0.77      0.77      0.77     41191
+weighted avg       0.77      0.77      0.77     41191
+
+Confusion Matrix:
+TP:    15765 | FN:    4446
+FP:     4830 | TN:        16150
+AUC: 0.8614
+#######################################################################################
+
+--- 3. IBRIDO NAIVE (Unione soglie singole) ---
+              precision    recall  f1-score   support
+
+      Benign       0.86      0.76      0.80     20980
+      Attack       0.77      0.87      0.82     20211
+
+    accuracy                           0.81     41191
+   macro avg       0.82      0.81      0.81     41191
+weighted avg       0.82      0.81      0.81     41191
+
+Confusion Matrix:
+TP:    17587 | FN:    2624
+FP:     5130 | TN:        15850
+AUC: 0.8128
+#######################################################################################
+
+[Ottimizzazione] Cerco soglie ibride ottimali (Avg OR Min)...
+
+--- Simulazione: IBRIDA (Mean OR Min) ---
+              precision    recall  f1-score   support
+
+      Benign       0.82      0.96      0.88     20980
+      Attack       0.95      0.78      0.86     20211
+
+    accuracy                           0.87     41191
+   macro avg       0.89      0.87      0.87     41191
+weighted avg       0.88      0.87      0.87     41191
+
+Confusion Matrix:
+TP:    15799 | FN:    4412
+FP:     828 | TN:        20152
+AUC: 0.8711
+#######################################################################################
+
+--- Riepilogo Soglie Scelte ---
+Mean Only Threshold: -0.6986
+Min Only Threshold:  -2.3811
+Hybrid Thresholds:   Avg < -0.7599 OR Min < -3.4621
