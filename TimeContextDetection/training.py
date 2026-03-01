@@ -15,48 +15,56 @@ model_checkpoint = "google/byt5-small"
 train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/train.txt"
 valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt"
 
-SEQUENCE_LENGTH = 5
-SEPARATOR = " "
+# Parametri
+SEQUENCE_LENGTH = 5  
 MAX_TOKEN_LENGTH = 512
-
-COLUMN_NAMES = ["packet", "label"]
 
 def tokenize_and_mask_every_packet(example_batch):
     """
-    Strategia 'All-Positions': Per ogni sequenza, genera N esempi di training,
-    mascherando ogni pacchetto a turno (P1, poi P2, poi P3...).
-    Inoltre gestisce la decodifica Hex -> Latin1 in modo sicuro.
+    Prende le sequenze di pacchetti (già create nel dataset) e genera 
+    esempi di training mascherando un pacchetto alla volta.
+    Gestisce:
+    - Decoding Hex -> Latin1
+    - Mascheramento posizionale (Data Augmentation)
+    - Prevenzione errori su batch vuoti
     """
     input_strings = []
     label_strings = []
     
-    # example_batch["packet"] contiene le stringhe RAW HEX originali
+    # example_batch["packet"] contiene la stringa completa della sequenza (es. "P1 P2 P3 P4 P5")
     for hex_seq_str in example_batch["packet"]:
         
-        # 1. Split sicuro sulla stringa HEX (lo spazio qui è solo separatore)
-        hex_packets = hex_seq_str.strip().split(SEPARATOR)
+        # 1. Controllo validità stringa
+        if not hex_seq_str: 
+            continue
+            
+        # 2. Split sicuro: .split() gestisce automaticamente spazi singoli, doppi o tabulazioni
+        hex_packets = hex_seq_str.strip().split()
         
+        # Se la riga è corrotta e ha meno di 2 pacchetti, la saltiamo
         if len(hex_packets) < 2:
             continue
             
-        # 2. Decodifica: Convertiamo i pacchetti da Hex a Latin-1 Bytes
-        # (Lo facciamo dopo lo split per evitare il bug del byte 0x20 che diventa spazio)
+        # 3. Decodifica: Convertiamo i pacchetti da Hex a Latin-1 Bytes
         packets = []
         try:
             for hp in hex_packets:
                 packets.append(bytes.fromhex(hp).decode('latin-1'))
         except ValueError:
-            continue # Salta righe corrotte
+            continue # Salta intera riga se c'è un pacchetto hex corrotto
             
-        # 3. Generazione delle Variazioni (Data Augmentation)
-        # Invece di un random, facciamo un loop su TUTTI i pacchetti
+        # 4. Generazione delle Variazioni
+        # Il dataset contiene già la finestra. Noi generiamo 5 esempi per ogni riga,
+        # insegnando al modello a predire il pacchetto i-esimo dato il contesto degli altri.
         for i in range(len(packets)):
             
             # --- INPUT: Maschera il pacchetto i-esimo ---
             masked_packets = packets.copy()
-            # Note: See ByT5 warning below regarding <extra_id_0>
+            # Usiamo il sentinel token standard. ByT5 lo mapperà internamente al byte corretto (es. 258)
             masked_packets[i] = "<extra_id_0>" 
-            input_str = SEPARATOR.join(masked_packets)
+            
+            # Ricostruiamo la stringa con lo spazio come separatore
+            input_str = " ".join(masked_packets)
             
             # --- LABEL: Il contenuto del pacchetto i-esimo ---
             target_packet = packets[i]
@@ -65,8 +73,7 @@ def tokenize_and_mask_every_packet(example_batch):
             input_strings.append(input_str)
             label_strings.append(label_str)
 
-    # 4. Tokenizzazione massiva
-    # Nota: input_strings sarà molto più lunga del batch originale (moltiplicata per seq_len)
+    # 5. Tokenizzazione
     model_inputs = tokenizer(input_strings, max_length=MAX_TOKEN_LENGTH, padding="max_length", truncation=True)
     labels = tokenizer(label_strings, max_length=MAX_TOKEN_LENGTH, padding="max_length", truncation=True)
     
@@ -86,13 +93,20 @@ if __name__ == "__main__":
     tokenizer = ByT5Tokenizer.from_pretrained(model_checkpoint)
 
     print("Loading Data via Pandas...")
-    train_df = pd.read_csv(train_file, names=COLUMN_NAMES, header=None, dtype=str)
-    valid_df = pd.read_csv(valid_file, names=COLUMN_NAMES, header=None, dtype=str)
+    # MODIFICA CARICAMENTO:
+    # sep="," -> Il file ha virgole che separano la sequenza dalle label numeriche
+    # usecols=[0] -> Carichiamo SOLO la prima colonna (la sequenza di pacchetti)
+    # names=["packet"] -> Assegniamo il nome per riferirci dopo
+    train_df = pd.read_csv(train_file, sep=",", header=None, usecols=[0], names=["packet"], dtype=str)
+    valid_df = pd.read_csv(valid_file, sep=",", header=None, usecols=[0], names=["packet"], dtype=str)
+    
+    # Rimuoviamo eventuali righe vuote o NaN generate dal parsing
+    train_df = train_df.dropna()
+    valid_df = valid_df.dropna()
     
     print(f"Original Size -> Train: {len(train_df)}, Valid: {len(valid_df)}")
     
-    # Prendiamo il 20% (frac=0.2) delle righe in modo casuale.
-    # random_state=42 assicura che se rilanci lo script prendi sempre le stesse righe (riproducibilità).
+    # Sampling (Opzionale: mantieni se vuoi ridurre i tempi di test)
     train_df = train_df.sample(frac=0.2, random_state=42).reset_index(drop=True)
     valid_df = valid_df.sample(frac=0.2, random_state=42).reset_index(drop=True)
     print(f"Sampled Size (1/5) -> Train: {len(train_df)}, Valid: {len(valid_df)}")
@@ -102,12 +116,12 @@ if __name__ == "__main__":
     
     dataset = datasets.DatasetDict({"train": train_dataset, "valid": valid_dataset})
 
-    # 2. Tokenize e Mask (Generating All Variations)
+    # Tokenize e Mask
     print("Applying All-Packet Masking (Dataset size will increase)...")
     dataset = dataset.map(
         tokenize_and_mask_every_packet, 
         batched=True, 
-        remove_columns=COLUMN_NAMES
+        remove_columns=["packet"] # Rimuoviamo la colonna raw, lasciamo i tensori
     )
     
     print(f"Dataset Size After Expansion: Train={len(dataset['train'])}, Valid={len(dataset['valid'])}")
@@ -122,7 +136,7 @@ if __name__ == "__main__":
         per_device_eval_batch_size=8,
         gradient_accumulation_steps=4,
         weight_decay=0.01,
-        num_train_epochs=15, # Ho abbassato le epoch perché il dataset è 5x più grande!
+        num_train_epochs=15,
         save_strategy="epoch",
         save_total_limit=2,
         logging_steps=50,
