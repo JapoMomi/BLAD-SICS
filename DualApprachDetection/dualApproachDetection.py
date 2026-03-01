@@ -4,7 +4,7 @@ import numpy as np
 import torch.nn.functional as F
 from tqdm import tqdm
 from transformers import AutoTokenizer, T5ForConditionalGeneration
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 
 # --- CONFIGURAZIONE ---
 SEQUENCE_LENGTH = 5
@@ -240,6 +240,12 @@ if __name__ == "__main__":
     
     cm = confusion_matrix(df['True_Label'], df['Pred_Label'])
     print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
+
+    try:
+        auc_score = roc_auc_score(df['True_Label'], -df['Final_Score'])
+        print(f"AUC: {auc_score:.4f}")
+    except ValueError:
+        print("AUC: Impossibile calcolare (forse una sola classe presente?)")
     
     df.to_csv(OUTPUT_CSV, index=False)
     print(f"Salvati risultati dettagliati in {OUTPUT_CSV}")
