@@ -20,14 +20,15 @@ Addestramento completato.
 REPORT DI CLASSIFICAZIONE:
               precision    recall  f1-score   support
 
-           0     0.7114    0.9908    0.8282     10490
-           1     0.9840    0.5828    0.7320     10106
+           0     0.7458    0.9916    0.8513     10490
+           1     0.9868    0.6491    0.7831     10106
 
-    accuracy                         0.7906     20596
-   macro avg     0.8477    0.7868    0.7801     20596
-weighted avg     0.8452    0.7906    0.7810     20596
+    accuracy                         0.8236     20596
+   macro avg     0.8663    0.8204    0.8172     20596
+weighted avg     0.8640    0.8236    0.8178     20596
 
 Confusion Matrix:
-[TP: 5890  | FN: 4216 ]
-[FP: 96    | TN: 10394]
+[TP: 6560  | FN: 3546 ]
+[FP: 88    | TN: 10402]
+AUC: 0.9783
 Grafico salvato in classifier_separation.png

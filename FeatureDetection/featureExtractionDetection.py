@@ -5,7 +5,7 @@ from tqdm import tqdm
 from transformers import ByT5Tokenizer, T5ForConditionalGeneration
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 import matplotlib.pyplot as plt
 
 # --- CONFIGURAZIONE ---
@@ -135,6 +135,10 @@ if __name__ == "__main__":
     
     cm = confusion_matrix(final_eval_y, preds)
     print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
+    # Calcoliamo le probabilità: colonna 0 = Benigno, colonna 1 = Attacco
+    probs = clf.predict_proba(X_eval)[:, 1]
+    auc_score = roc_auc_score(final_eval_y, probs)
+    print(f"AUC: {auc_score:.4f}")
 
     # (Opzionale) Visualizzazione separazione
     probs = clf.predict_proba(X_eval)[:, 1]
