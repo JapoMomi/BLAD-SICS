@@ -2,32 +2,30 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from transformers import ByT5Tokenizer, T5ForConditionalGeneration
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from transformers import AutoTokenizer, T5ForConditionalGeneration
+from sklearn.ensemble import IsolationForest
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 import matplotlib.pyplot as plt
 
-# --- CONFIGURAZIONE ---
-# Assicurati che questo path punti al modello TimeContext addestrato
-MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
 
-# File originali
-TRAIN_FILE_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/train.txt" # Solo Benigni
-TEST_FILE_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt"   # Misto (Benigni + Attacchi)
+MODEL_PATH = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
+TRAIN_FILE_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/train.txt" 
+TEST_FILE_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt"
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 32
 
 def load_data(filepath):
-    """Legge il file CSV-like e ritorna liste di sequenze e label"""
     print(f"Lettura {filepath}...")
-    df = pd.read_csv(filepath, header=None, dtype=str)
-    # Col 0: Sequenza Hex
-    sequences = df[0].values
-    # Ultima colonna: Label della sequenza (0 o 1)
-    labels = df.iloc[:, -1].astype(int).values
-    return sequences, labels
+    try:
+        df = pd.read_csv(filepath, header=None, dtype=str)
+        sequences = df[0].values
+        # Assumiamo che l'ultima colonna sia la label, ma per il training la ignoreremo
+        labels = df.iloc[:, -1].astype(int).values
+        return sequences, labels
+    except Exception as e:
+        print(f"Errore lettura file: {e}")
+        return [], []
 
 def hex_to_latin1(hex_str):
     try:
@@ -37,24 +35,17 @@ def hex_to_latin1(hex_str):
         return ""
 
 def extract_embeddings(model, tokenizer, sequences, batch_size=32, desc="Extracting"):
-    """
-    Usa l'Encoder di ByT5 per trasformare le sequenze in vettori numerici (Embeddings).
-    Include una progress bar (tqdm).
-    """
+    """ Estrae gli embedding usando l'Encoder di ByT5 """
     model.eval()
     all_embeddings = []
     
-    # Calcoliamo il numero totale di batch per la progress bar
     total_batches = (len(sequences) + batch_size - 1) // batch_size
     
-    print(f"Inizio estrazione features per {len(sequences)} campioni...")
-    
-    # tqdm avvolge il range per mostrare la barra
+    # Progress bar per monitorare l'estrazione (può essere lunga)
     for i in tqdm(range(0, len(sequences), batch_size), total=total_batches, desc=desc, unit="batch"):
         batch_hex = sequences[i : i + batch_size]
         batch_latin1 = [hex_to_latin1(s) for s in batch_hex]
         
-        # Tokenizzazione
         inputs = tokenizer(
             batch_latin1, 
             return_tensors="pt", 
@@ -64,89 +55,90 @@ def extract_embeddings(model, tokenizer, sequences, batch_size=32, desc="Extract
         ).to(DEVICE)
         
         with torch.no_grad():
-            # USIAMO SOLO L'ENCODER
             encoder_outputs = model.encoder(
                 input_ids=inputs.input_ids, 
                 attention_mask=inputs.attention_mask
             )
             last_hidden_state = encoder_outputs.last_hidden_state
             
-            # MEAN POOLING: Media dei token validi
+            # Mean Pooling
             mask = inputs.attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
             sum_embeddings = torch.sum(last_hidden_state * mask, 1)
             sum_mask = torch.clamp(mask.sum(1), min=1e-9)
             mean_embeddings = sum_embeddings / sum_mask
             
-            # Portiamo su CPU e accumuliamo
             all_embeddings.append(mean_embeddings.cpu().numpy())
             
-    return np.vstack(all_embeddings)
+    if len(all_embeddings) > 0:
+        return np.vstack(all_embeddings)
+    else:
+        return np.array([])
 
 # --- MAIN FLOW ---
 
 if __name__ == "__main__":
-    # 1. Caricamento Modello
-    print(f"Caricamento ByT5 Encoder da {MODEL_PATH} su {DEVICE}...")
-    tokenizer = ByT5Tokenizer.from_pretrained(MODEL_PATH)
-    model = T5ForConditionalGeneration.from_pretrained(MODEL_PATH).to(DEVICE)
-
-    # 2. Caricamento Dati Grezzi
-    seq_train_benign, y_train_benign = load_data(TRAIN_FILE_PATH)
-    seq_test_mixed, y_test_mixed = load_data(TEST_FILE_PATH)
-
-    # 3. Preparazione Dataset per il Classificatore (Bilanciamento)
-    # Prendiamo il 50% del Test Set (che contiene attacchi) per insegnare al classificatore cos'è un attacco
-    print("Splitting del Test Set per il training del classificatore...")
-    seq_test_split_train, seq_test_split_eval, y_test_split_train, y_test_split_eval = train_test_split(
-        seq_test_mixed, y_test_mixed, test_size=0.5, random_state=42, stratify=y_test_mixed
-    )
-
-    # Costruiamo il Training Set finale: Benigni originali + Metà del Test Set (misto)
-    final_train_seq = np.concatenate([seq_train_benign, seq_test_split_train])
-    final_train_y = np.concatenate([y_train_benign, y_test_split_train])
-
-    # Il set di valutazione è la rimanente metà del test set (dati mai visti dal Random Forest)
-    final_eval_seq = seq_test_split_eval
-    final_eval_y = y_test_split_eval
-
-    print(f"\n--- Setup Dataset Finale ---")
-    print(f"TRAIN Set: {len(final_train_seq)} samples (Benigni: {sum(final_train_y==0)}, Attacchi: {sum(final_train_y==1)})")
-    print(f"EVAL Set:  {len(final_eval_seq)} samples (Benigni: {sum(final_eval_y==0)}, Attacchi: {sum(final_eval_y==1)})")
-
-    # 4. Estrazione Features (con progress bar!)
-    print("\n--- Fase 1: Estrazione Embeddings (ByT5) ---")
-    X_train = extract_embeddings(model, tokenizer, final_train_seq, batch_size=BATCH_SIZE, desc="Train Set")
-    X_eval = extract_embeddings(model, tokenizer, final_eval_seq, batch_size=BATCH_SIZE, desc="Eval Set")
-
-    print(f"Shape Embeddings Train: {X_train.shape}")
-
-    # 5. Addestramento Classificatore
-    print("\n--- Fase 2: Addestramento Random Forest ---")
-    clf = RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=42)
-    clf.fit(X_train, final_train_y)
-    print("Addestramento completato.")
-
-    # 6. Valutazione
-    print("\n--- Fase 3: Valutazione ---")
-    preds = clf.predict(X_eval)
-
-    print("\nREPORT DI CLASSIFICAZIONE:")
-    print(classification_report(final_eval_y, preds, digits=4))
+    print(f"--- ANOMALY DETECTION (Training solo su Benigni) ---")
     
-    cm = confusion_matrix(final_eval_y, preds)
-    print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
-    # Calcoliamo le probabilità: colonna 0 = Benigno, colonna 1 = Attacco
-    probs = clf.predict_proba(X_eval)[:, 1]
-    auc_score = roc_auc_score(final_eval_y, probs)
-    print(f"AUC: {auc_score:.4f}")
+    # 1. Caricamento Modello ByT5 (Feature Extractor)
+    print(f"Caricamento ByT5 Encoder...")
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
+    model = T5ForConditionalGeneration.from_pretrained(MODEL_PATH, local_files_only=True).to(DEVICE)
 
-    # (Opzionale) Visualizzazione separazione
-    probs = clf.predict_proba(X_eval)[:, 1]
+    # 2. Caricamento Dati
+    # TRAIN: Solo Benigni
+    seq_train, y_train = load_data(TRAIN_FILE_PATH)
+    # TEST: Misto
+    seq_test, y_test = load_data(TEST_FILE_PATH)
+    print(f"TRAIN Set (Benign Only): {len(seq_train)} samples")
+    print(f"TEST Set (Mixed):        {len(seq_test)} samples (Attacchi: {np.sum(y_test)})")
+
+    # 3. Estrazione Features
+    # Nota: Estraiamo features per TUTTO il train set benigno per insegnare la normalità
+    print("\n--- Fase 1: Estrazione Embeddings ---")
+    X_train = extract_embeddings(model, tokenizer, seq_train, batch_size=BATCH_SIZE, desc="Embedding Train")
+    X_test = extract_embeddings(model, tokenizer, seq_test, batch_size=BATCH_SIZE, desc="Embedding Test")
+
+    # 4. Addestramento Isolation Forest
+    print("\n--- Fase 2: Addestramento Isolation Forest (Unsupervised) ---")
+    # contamination='auto' lascia decidere all'algoritmo, oppure puoi settare un valore basso (es. 0.01)
+    # se sai che il training set è sporco. Se è pulito, 'auto' va bene.
+    clf = IsolationForest(n_estimators=100, contamination='auto', n_jobs=-1, random_state=42)
+    
+    # NOTA: Qui passiamo SOLO X_train, senza y_train! 
+    # L'algoritmo non sa che sono "0", sa solo che "questi sono dati normali".
+    clf.fit(X_train)
+    print("Modello addestrato sulla 'Normalità'.")
+
+    # 5. Detection su Test Set
+    print("\n--- Fase 3: Valutazione su Dati Misti ---")
+    # Isolation Forest ritorna: 1 per INLIERS (Benigni), -1 per OUTLIERS (Attacchi)
+    raw_preds = clf.predict(X_test)
+    
+    # Dobbiamo convertire l'output di Isolation Forest (1/-1) nel formato delle tue label (0/1)
+    # IF Output:  1 (Normal) -> Tua Label: 0
+    # IF Output: -1 (Anomaly) -> Tua Label: 1
+    preds_converted = np.where(raw_preds == 1, 0, 1)
+
+    print("\nREPORT DI CLASSIFICAZIONE (Isolation Forest):")
+    print(classification_report(y_test, preds_converted, digits=4, target_names=["Benign", "Attack"]))
+    
+    cm = confusion_matrix(y_test, preds_converted)
+    print(f"Confusion Matrix:\n[TP (Attacchi presi): {cm[1][1]} | FN (Persi): {cm[1][0]}]\n[FP (Falsi allarmi): {cm[0][1]} | TN (Benigni OK): {cm[0][0]}]")
+    
+    # Anomaly Score (più è basso, più è anomalo)
+    # Isolation Forest dà score negativi per anomalie e positivi per normali
+    # Invertiamo il segno per avere "Score di Anomalia" (Più alto = Più anomalo) per coerenza grafica
+    anomaly_scores = -clf.decision_function(X_test)
+    
+    auc_score = roc_auc_score(y_test, anomaly_scores)
+    print(f"ROC AUC: {auc_score:.4f}")
+
+    # Visualizzazione
     plt.figure(figsize=(10, 6))
-    plt.hist(probs[final_eval_y==0], bins=50, alpha=0.5, label='Benign', color='green', density=True)
-    plt.hist(probs[final_eval_y==1], bins=50, alpha=0.5, label='Attack', color='red', density=True)
-    plt.title('Probabilità Random Forest (Feature Extraction)')
-    plt.xlabel('Probabilità di Attacco')
+    plt.hist(anomaly_scores[y_test==0], bins=50, alpha=0.5, label='Benign', color='green', density=True)
+    plt.hist(anomaly_scores[y_test==1], bins=50, alpha=0.5, label='Attack', color='red', density=True)
+    plt.title('Distribuzione Anomaly Score (Isolation Forest)')
+    plt.xlabel('Score Anomalia (Alto = Probabile Attacco)')
     plt.legend()
-    plt.savefig("classifier_separation.png")
-    print("Grafico salvato in classifier_separation.png")
+    plt.savefig("isolation_forest_separation.png")
+    print("Grafico salvato in isolation_forest_separation.png")

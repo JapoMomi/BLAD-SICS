@@ -1,0 +1,19 @@
+Ottimizzazione con MEDIA in corso (Target: F1-Score)...
+
+============================================================
+RISULTATI OTTIMIZZATI (Strategy: MEAN | Beta=1)
+Miglior Peso SinglePacket: 0.7 (Context Mean: 0.3)
+Miglior Soglia Normalizzata: -0.1381
+============================================================
+              precision    recall  f1-score   support
+
+           0     0.9224    0.9883    0.9542     32113
+           1     0.9446    0.7059    0.8080      9082
+
+    accuracy                         0.9260     41195
+   macro avg     0.9335    0.8471    0.8811     41195
+weighted avg     0.9273    0.9260    0.9220     41195
+
+Confusion Matrix:
+[TP: 6411  | FN: 2671 ]
+[FP: 376   | TN: 31737]

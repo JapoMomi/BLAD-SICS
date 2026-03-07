@@ -1,0 +1,29 @@
+--- ANOMALY DETECTION (Training solo su Benigni) ---
+Caricamento ByT5 Encoder...
+Lettura /home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/train.txt...
+Lettura /home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt...
+TRAIN Set (Benign Only): 149992 samples
+TEST Set (Mixed):        41191 samples (Attacchi: 20211)
+
+--- Fase 1: Estrazione Embeddings ---
+
+--- Fase 2: Addestramento Isolation Forest (Unsupervised) ---
+Modello addestrato sulla 'Normalità'.
+
+--- Fase 3: Valutazione su Dati Misti ---
+
+REPORT DI CLASSIFICAZIONE (Isolation Forest):
+              precision    recall  f1-score   support
+
+      Benign     0.5144    0.9991    0.6792     20980
+      Attack     0.9593    0.0210    0.0411     20211
+
+    accuracy                         0.5192     41191
+   macro avg     0.7368    0.5101    0.3601     41191
+weighted avg     0.7327    0.5192    0.3661     41191
+
+Confusion Matrix:
+[TP (Attacchi presi): 424 | FN (Persi): 19787]
+[FP (Falsi allarmi): 18 | TN (Benigni OK): 20962]
+ROC AUC: 0.5797
+Grafico salvato in isolation_forest_separation.png
