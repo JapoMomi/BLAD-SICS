@@ -5,17 +5,17 @@
 --- 1. SOLO MEAN (Avg_Score) ---
               precision    recall  f1-score   support
 
-      Benign       0.84      0.92      0.88     20980
-      Attack       0.91      0.82      0.86     20211
+      Benign       0.80      0.87      0.83     20980
+      Attack       0.85      0.77      0.81     20211
 
-    accuracy                           0.87     41191
-   macro avg       0.88      0.87      0.87     41191
-weighted avg       0.88      0.87      0.87     41191
+    accuracy                           0.82     41191
+   macro avg       0.83      0.82      0.82     41191
+weighted avg       0.83      0.82      0.82     41191
 
 Confusion Matrix:
-TP:    16657 | FN:    3554
-FP:     1655 | TN:        19325
-AUC: 0.9302
+TP:    15612 | FN:    4599
+FP:     2700 | TN:        18280
+AUC: 0.8927
 #######################################################################################
 
 [Ottimizzazione] Cerco la miglior soglia per: Min Only...
@@ -39,17 +39,17 @@ AUC: 0.8614
 --- 3. IBRIDO NAIVE (Unione soglie singole) ---
               precision    recall  f1-score   support
 
-      Benign       0.86      0.76      0.80     20980
-      Attack       0.77      0.87      0.82     20211
+      Benign       0.84      0.75      0.79     20980
+      Attack       0.77      0.86      0.81     20211
 
-    accuracy                           0.81     41191
-   macro avg       0.82      0.81      0.81     41191
-weighted avg       0.82      0.81      0.81     41191
+    accuracy                           0.80     41191
+   macro avg       0.80      0.80      0.80     41191
+weighted avg       0.81      0.80      0.80     41191
 
 Confusion Matrix:
-TP:    17587 | FN:    2624
-FP:     5130 | TN:        15850
-AUC: 0.8128
+TP:    17283 | FN:    2928
+FP:     5283 | TN:        15697
+AUC: 0.8017
 #######################################################################################
 
 [Ottimizzazione] Cerco soglie ibride ottimali (Avg OR Min)...
@@ -57,20 +57,20 @@ AUC: 0.8128
 --- Simulazione: IBRIDA (Mean OR Min) ---
               precision    recall  f1-score   support
 
-      Benign       0.82      0.96      0.88     20980
-      Attack       0.95      0.78      0.86     20211
+      Benign       0.80      0.92      0.86     20980
+      Attack       0.90      0.77      0.83     20211
 
-    accuracy                           0.87     41191
-   macro avg       0.89      0.87      0.87     41191
-weighted avg       0.88      0.87      0.87     41191
+    accuracy                           0.84     41191
+   macro avg       0.85      0.84      0.84     41191
+weighted avg       0.85      0.84      0.84     41191
 
 Confusion Matrix:
-TP:    15799 | FN:    4412
-FP:     828 | TN:        20152
-AUC: 0.8711
+TP:    15475 | FN:    4736
+FP:     1727 | TN:        19253
+AUC: 0.8417
 #######################################################################################
 
 --- Riepilogo Soglie Scelte ---
-Mean Only Threshold: -0.6986
+Mean Only Threshold: -0.7179
 Min Only Threshold:  -2.3811
-Hybrid Thresholds:   Avg < -0.7599 OR Min < -3.4621
+Hybrid Thresholds:   Avg < -0.7795 OR Min < -3.1126

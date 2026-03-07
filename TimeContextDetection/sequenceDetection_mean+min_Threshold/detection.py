@@ -145,9 +145,9 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
     labels = np.array(labels)
 
     # --- TEMPORAL SMOOTHING (Solo sulla Media, il Minimo è impulsivo) ---
-    scores_series = pd.Series(final_avg_scores)
-    smoothed_avg_scores = scores_series.ewm(span=3, adjust=False).mean().values
-    final_avg_scores = smoothed_avg_scores
+    #scores_series = pd.Series(final_avg_scores)
+    #smoothed_avg_scores = scores_series.ewm(span=3, adjust=False).mean().values
+    #final_avg_scores = smoothed_avg_scores
 
     # --- CALCOLO O APPLICAZIONE SOGLIE ---
     if thresholds is None:
