@@ -1,0 +1,85 @@
+Caricamento dati da /home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/singlePacketVotingDetection/detection_final_with_preds.csv...
+
+🔍 RICERCA BEST THRESHOLD PER STRATEGIA
+Strategia MAJORITY     -> Miglior F1 (Attack): 0.6970 (Soglia Ottimale: -2.3113)
+Strategia AT_LEAST_1   -> Miglior F1 (Attack): 0.6980 (Soglia Ottimale: -2.3835)
+Strategia AT_LEAST_2   -> Miglior F1 (Attack): 0.6954 (Soglia Ottimale: -2.3113)
+Strategia STRICT_ALL   -> Miglior F1 (Attack): 0.6967 (Soglia Ottimale: -2.1669)
+
+############################################################
+ RISULTATI DETTAGLIATI 
+############################################################
+
+============================================================
+STRATEGIA: MAJORITY (Soglia Ottimale: -2.3113)
+============================================================
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.8987    0.9555    0.9262     32113
+      Attack     0.7973    0.6190    0.6970      9082
+
+    accuracy                         0.8813     41195
+   macro avg     0.8480    0.7873    0.8116     41195
+weighted avg     0.8763    0.8813    0.8757     41195
+
+Confusion Matrix:
+TP: 5622  | FN: 3460 
+FP: 1429  | TN: 30684
+ROC AUC: 0.7873
+
+============================================================
+STRATEGIA: AT_LEAST_1 (Soglia Ottimale: -2.3835)
+============================================================
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.9020    0.9473    0.9241     32113
+      Attack     0.7735    0.6360    0.6980      9082
+
+    accuracy                         0.8787     41195
+   macro avg     0.8378    0.7917    0.8111     41195
+weighted avg     0.8737    0.8787    0.8743     41195
+
+Confusion Matrix:
+TP: 5776  | FN: 3306 
+FP: 1691  | TN: 30422
+ROC AUC: 0.7917
+
+============================================================
+STRATEGIA: AT_LEAST_2 (Soglia Ottimale: -2.3113)
+============================================================
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.9011    0.9473    0.9236     32113
+      Attack     0.7724    0.6325    0.6954      9082
+
+    accuracy                         0.8779     41195
+   macro avg     0.8367    0.7899    0.8095     41195
+weighted avg     0.8727    0.8779    0.8733     41195
+
+Confusion Matrix:
+TP: 5744  | FN: 3338 
+FP: 1693  | TN: 30420
+ROC AUC: 0.7899
+
+============================================================
+STRATEGIA: STRICT_ALL (Soglia Ottimale: -2.1669)
+============================================================
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.9010    0.9488    0.9243     32113
+      Attack     0.7773    0.6312    0.6967      9082
+
+    accuracy                         0.8788     41195
+   macro avg     0.8391    0.7900    0.8105     41195
+weighted avg     0.8737    0.8788    0.8741     41195
+
+Confusion Matrix:
+TP: 5733  | FN: 3349 
+FP: 1643  | TN: 30470
+ROC AUC: 0.7900
+
+🏆 VINCITORE ASSOLUTO: AT_LEAST_1 con F1-Score (Attack): 0.6980
