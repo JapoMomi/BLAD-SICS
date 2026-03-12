@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix, fbeta_score
+from sklearn.metrics import classification_report, confusion_matrix, fbeta_score, roc_auc_score
 
 # Carica i risultati salvati
 df = pd.read_csv("/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv")
@@ -66,6 +66,16 @@ beta_val = 1
 
 best_w, best_th, final_preds = optimize_detection_mean(df, beta=beta_val)
 
+# --- CALCOLO AUC ---
+# Ricostruiamo lo score continuo ottimale usando il peso migliore trovato
+# (df è stato modificato in-place dalla funzione con le colonne _Norm, quindi possiamo usarle)
+final_continuous_scores = (best_w * df['S_Norm']) + ((1 - best_w) * df['C_Norm'])
+
+# Importante: roc_auc_score si aspetta che score ALTI = Anomalia (Classe 1).
+# Nel tuo codice, score BASSI (< th) sono anomalie.
+# Quindi passiamo lo score col segno invertito (-final_continuous_scores)
+auc_val = roc_auc_score(df['True_Label'], -final_continuous_scores)
+
 print(f"\n{'='*60}")
 print(f"RISULTATI OTTIMIZZATI (Strategy: MEAN | Beta={beta_val})")
 print(f"Miglior Peso SinglePacket: {best_w:.1f} (Context Mean: {1-best_w:.1f})")
@@ -75,3 +85,4 @@ print(f"{'='*60}")
 print(classification_report(df['True_Label'], final_preds, digits=4))
 cm = confusion_matrix(df['True_Label'], final_preds)
 print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
+print(f"ROC AUC: {auc_val:.4f}")

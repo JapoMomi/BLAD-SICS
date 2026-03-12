@@ -17,3 +17,4 @@ weighted avg     0.9273    0.9260    0.9220     41195
 Confusion Matrix:
 [TP: 6411  | FN: 2671 ]
 [FP: 376   | TN: 31737]
+ROC AUC: 0.8794
