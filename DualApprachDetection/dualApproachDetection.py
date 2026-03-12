@@ -16,7 +16,7 @@ MASK_TOKEN_ID = 258 # <extra_id_0> per ByT5
 PATH_SINGLE = "/home/spritz/storage/disk0/Master_Thesis/SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned"
 PATH_CONTEXT = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt"
-OUTPUT_CSV = "dual_model_detection_results.csv"
+OUTPUT_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
