@@ -1,88 +1,195 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix, fbeta_score, roc_auc_score
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, f1_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import IsolationForest
+from sklearn.svm import OneClassSVM
+from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans
+from sklearn.neighbors import LocalOutlierFactor
+import warnings
 
-# Carica i risultati salvati
-df = pd.read_csv("/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv")
+# --- CONFIGURAZIONE ---
+VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
+TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
 
-def optimize_detection_mean(df, beta):
-    """
-    Ottimizzazione basata sulla MEDIA dei contesti (più conservativa sui FP).
-    """
-    
-    # 1. AGGREGAZIONE (MEAN invece di MIN)
+# Tolleranze di Falsi Allarmi (FPR) da testare sul Validation Set
+TARGET_FPRS = np.arange(0.01, 10.1, 0.02) # Da 0.1% a 5.0%
+
+# Smoothing temporale
+EWMA_SPAN = 5 
+# Peso per le Euristiche 
+WEIGHT_SINGLE = 0.3 
+
+def print_report(y_true, y_pred, y_probs, title):
+    print(f"\n{'='*80}\n{title}\n{'='*80}")
+    print(classification_report(y_true, y_pred, digits=4, target_names=["Benign", "Attack"], zero_division=0))
+    cm = confusion_matrix(y_true, y_pred)
+    print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
+    if y_probs is not None:
+        try:
+            print(f"ROC AUC: {roc_auc_score(y_true, y_probs):.4f}")
+        except ValueError:
+            pass
+
+def prep_features(df):
+    """Calcola le meta-feature di base per il dataset."""
     context_cols = [c for c in df.columns if 'Ctx_Pos' in c]
-    # Usiamo la media: riduce il rumore, ma rischia di nascondere picchi di anomalia
-    df['Mean_Context'] = df[context_cols].mean(axis=1) 
     
-    # 2. NORMALIZZAZIONE (Z-Score)
-    # È fondamentale normalizzare perché la media avrà una scala diversa dal minimo
+    df[context_cols] = df[context_cols].apply(lambda row: row.fillna(row.mean()), axis=1)
+    df['Single_Score'] = df['Single_Score'].fillna(df['Single_Score'].mean())
     
-    # Single Score Norm
-    s_mean = df['Single_Score'].mean()
-    s_std = df['Single_Score'].std()
-    df['S_Norm'] = (df['Single_Score'] - s_mean) / s_std
+    df['Min_Context'] = df[context_cols].min(axis=1)
+    df['Mean_Context'] = df[context_cols].mean(axis=1)
+    df['Max_Context'] = df[context_cols].max(axis=1)
+    df['Std_Context'] = df[context_cols].std(axis=1).fillna(0)
     
-    # Context Score Norm (Sulla colonna Mean_Context)
-    c_mean = df['Mean_Context'].mean()
-    c_std = df['Mean_Context'].std()
-    df['C_Norm'] = (df['Mean_Context'] - c_mean) / c_std
+    df['Delta_Single_Min'] = df['Single_Score'] - df['Min_Context']
+    df['Delta_Single_Mean'] = df['Single_Score'] - df['Mean_Context']
+
+    df['Contex_Range'] = df['Max_Context'] - df['Min_Context']
+
+    if 'Ctx_Pos0' in df.columns and 'Ctx_Pos4' in df.columns:
+        df['Time_Gradient'] = df['Ctx_Pos4'] - df['Ctx_Pos0']
+    else:
+        df['Time_Gradient'] = 0.0
+    return df
+
+def z_norm_unsupervised(val_series, test_series):
+    """Normalizzazione basata solo sui parametri del Validation Set."""
+    mu = val_series.mean()
+    std = val_series.std()
+    if std == 0: std = 1e-9
+    return (val_series - mu) / std, (test_series - mu) / std
+
+def evaluate_sweep(method_name, val_scores, test_scores, y_test):
+    """
+    Applica l'EWMA e cerca la soglia migliore basandosi sul Validation Set.
+    Tutti gli score in ingresso devono essere: Valori Alti = Anomalia.
+    """
+    # Smoothing
+    val_smooth = pd.Series(val_scores).ewm(span=EWMA_SPAN, adjust=False).mean().values
+    test_smooth = pd.Series(test_scores).ewm(span=EWMA_SPAN, adjust=False).mean().values
     
-    # 3. RICERCA GRID SEARCH
-    best_score = -1
-    best_w = 0
-    best_th = 0
-    best_preds = None
+    best_f1, best_fpr, best_preds = -1, 0, None
     
-    print(f"Ottimizzazione con MEDIA in corso (Target: F{beta}-Score)...")
-    
-    weights = np.arange(0.1, 1.0, 0.1)
-    
-    for w in weights:
-        # Punteggio combinato pesato
-        combined_scores = (w * df['S_Norm']) + ((1 - w) * df['C_Norm'])
+    for fpr_target in TARGET_FPRS:
+        threshold = np.percentile(val_smooth, 100.0 - fpr_target)
+        preds = (test_smooth > threshold).astype(int)
+        current_f1 = f1_score(y_test, preds, zero_division=0)
         
-        # Grid search sulla soglia
-        thresholds = np.linspace(np.percentile(combined_scores, 1), np.percentile(combined_scores, 99), 100)
+        if current_f1 > best_f1:
+            best_f1 = current_f1
+            best_fpr = fpr_target
+            best_preds = preds
+            
+    print_report(y_test, best_preds, test_smooth, f"{method_name} | Ottimizzato su Val FPR: {best_fpr:.1f}%")
+    return best_f1
+
+def run_heuristics(df_val, df_test):
+    """Esegue le due euristiche di base (Z-Score combinato)."""
+    y_test = df_test['True_Label'].values
+    
+    val_s, test_s = z_norm_unsupervised(df_val['Single_Score'], df_test['Single_Score'])
+    val_cmin, test_cmin = z_norm_unsupervised(df_val['Min_Context'], df_test['Min_Context'])
+    val_cmean, test_cmean = z_norm_unsupervised(df_val['Mean_Context'], df_test['Mean_Context'])
+    
+    w = WEIGHT_SINGLE
+    # Invertiamo il segno: - (LogProb) diventa positivo per le anomalie
+    val_score_min = -(w * val_s + (1 - w) * val_cmin)
+    test_score_min = -(w * test_s + (1 - w) * test_cmin)
+    
+    val_score_mean = -(w * val_s + (1 - w) * val_cmean)
+    test_score_mean = -(w * test_s + (1 - w) * test_cmean)
+    
+    f1_min = evaluate_sweep("1. HEURISTIC (Single + Min Context)", val_score_min, test_score_min, y_test)
+    f1_mean = evaluate_sweep("2. HEURISTIC (Single + Mean Context)", val_score_mean, test_score_mean, y_test)
+    
+    return f1_min, f1_mean
+
+def run_ml_and_clustering(df_val, df_test, algo_name):
+    """Gestisce addestramento e inferenza per i 5 modelli di ML/Clustering."""
+    y_test = df_test['True_Label'].values
+    
+    # Golden Features
+    features = ['Single_Score', 'Delta_Single_Min', 'Contex_Range', 'Time_Gradient']
+    
+    # Scaling Unsupervised
+    scaler = StandardScaler()
+    X_val = scaler.fit_transform(df_val[features].values)
+    X_test = scaler.transform(df_test[features].values)
+    
+    if algo_name == 'iforest':
+        clf = IsolationForest(n_estimators=100, contamination=0.25, random_state=42, n_jobs=-1)
+        clf.fit(X_val)
+        val_scores = -clf.decision_function(X_val)
+        test_scores = -clf.decision_function(X_test)
+        title = "3. ML: Isolation Forest"
         
-        for th in thresholds:
-            preds = (combined_scores < th).astype(int)
-            
-            # Calcolo F-Beta
-            current_score = fbeta_score(df['True_Label'], preds, beta=beta)
-            
-            if current_score > best_score:
-                best_score = current_score
-                best_w = w
-                best_th = th
-                best_preds = preds
+    elif algo_name == 'ocsvm':
+        clf = OneClassSVM(nu=0.25, kernel='rbf', gamma='scale')
+        clf.fit(X_val)
+        val_scores = -clf.decision_function(X_val)
+        test_scores = -clf.decision_function(X_test)
+        title = "4. ML: One-Class SVM"
+        
+    elif algo_name == 'gmm':
+        clf = GaussianMixture(n_components=3, covariance_type='full', random_state=42)
+        clf.fit(X_val)
+        val_scores = -clf.score_samples(X_val)
+        test_scores = -clf.score_samples(X_test)
+        title = "5. CLUSTERING: Gaussian Mixture Model (GMM)"
+        
+    elif algo_name == 'kmeans':
+        clf = KMeans(n_clusters=3, random_state=42, n_init="auto")
+        clf.fit(X_val)
+        val_scores = np.min(clf.transform(X_val), axis=1)
+        test_scores = np.min(clf.transform(X_test), axis=1)
+        title = "6. CLUSTERING: K-Means"
 
-    return best_w, best_th, best_preds
+    return evaluate_sweep(title, val_scores, test_scores, y_test)
 
-# --- ESECUZIONE ---
-# beta=0.5 penalizza molto i FP (favorisce la Precision)
-# Se vuoi bilanciare, usa beta=1.0
-beta_val = 1
+def main():
+    print("Inizio Elaborazione Master Script...")
+    try:
+        df_val = pd.read_csv(VAL_FILE)
+        df_test = pd.read_csv(TEST_FILE)
+    except FileNotFoundError as e:
+        print(f"Errore: {e}")
+        return
 
-best_w, best_th, final_preds = optimize_detection_mean(df, beta=beta_val)
+    # Garanzia Unsupervised: rimuoviamo attacchi se presenti nel Val
+    if 'True_Label' in df_val.columns and df_val['True_Label'].sum() > 0:
+        df_val = df_val[df_val['True_Label'] == 0].copy()
 
-# --- CALCOLO AUC ---
-# Ricostruiamo lo score continuo ottimale usando il peso migliore trovato
-# (df è stato modificato in-place dalla funzione con le colonne _Norm, quindi possiamo usarle)
-final_continuous_scores = (best_w * df['S_Norm']) + ((1 - best_w) * df['C_Norm'])
+    # Prepara feature per tutto il dataset
+    df_val = prep_features(df_val)
+    df_test = prep_features(df_test)
 
-# Importante: roc_auc_score si aspetta che score ALTI = Anomalia (Classe 1).
-# Nel tuo codice, score BASSI (< th) sono anomalie.
-# Quindi passiamo lo score col segno invertito (-final_continuous_scores)
-auc_val = roc_auc_score(df['True_Label'], -final_continuous_scores)
+    results = {}
 
-print(f"\n{'='*60}")
-print(f"RISULTATI OTTIMIZZATI (Strategy: MEAN | Beta={beta_val})")
-print(f"Miglior Peso SinglePacket: {best_w:.1f} (Context Mean: {1-best_w:.1f})")
-print(f"Miglior Soglia Normalizzata: {best_th:.4f}")
-print(f"{'='*60}")
+    print("\n>>> ESECUZIONE EURISTICHE DI BASE <<<")
+    results['Heuristic (Min)'] , results['Heuristic (Mean)'] = run_heuristics(df_val, df_test)
 
-print(classification_report(df['True_Label'], final_preds, digits=4))
-cm = confusion_matrix(df['True_Label'], final_preds)
-print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
-print(f"ROC AUC: {auc_val:.4f}")
+    print("\n>>> ESECUZIONE MACHINE LEARNING (BOUNDARY) <<<")
+    results['Isolation Forest'] = run_ml_and_clustering(df_val, df_test, 'iforest')
+    results['One-Class SVM'] = run_ml_and_clustering(df_val, df_test, 'ocsvm')
+
+    print("\n>>> ESECUZIONE MACHINE LEARNING (CLUSTERING) <<<")
+    results['GMM (Gaussian Mixture)'] = run_ml_and_clustering(df_val, df_test, 'gmm')
+    results['K-Means'] = run_ml_and_clustering(df_val, df_test, 'kmeans')
+
+    print("\n" + "#"*75)
+    print(" CLASSIFICA FINALE F1-SCORE (Approccio 100% Unsupervised)")
+    print("#"*75)
+    
+    # Ordina i risultati dal migliore al peggiore
+    sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)
+    for i, (method, score) in enumerate(sorted_results, 1):
+        if i == 1:
+            print(f" 🏆 {method:<30}: {score:.4f}")
+        else:
+            print(f" {i}. {method:<30}: {score:.4f}")
+
+if __name__ == "__main__":
+    main()

@@ -1,134 +1,201 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score
-from sklearn.model_selection import cross_val_predict
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score, roc_auc_score, classification_report, confusion_matrix
+from sklearn.svm import OneClassSVM
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import RobustScaler
+import itertools
+import warnings
 
 # --- CONFIGURAZIONE ---
-INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
+VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
+TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
 
-def print_report(y_true, y_pred, y_probs, title):
-    print(f"\n{'='*70}\n{title}\n{'='*70}")
-    print(classification_report(y_true, y_pred, digits=4, target_names=["Benign", "Attack"]))
-    cm = confusion_matrix(y_true, y_pred)
-    print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
-    if y_probs is not None:
-        print(f"ROC AUC: {roc_auc_score(y_true, y_probs):.4f}")
+# Tolleranze FPR da testare sul Validation
+TARGET_FPRS = [0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0]
 
-def optimize_heuristic_min(df):
-    """Strategia Euristica: Z-Score sul Minimo dei Contesti invece che sulla Media"""
-    # 1. Troviamo il peggior score contestuale per ogni pacchetto
+# Griglia Parametri OCSVM
+OCSVM_GRID = {
+    'nu': [0.01, 0.05, 0.1, 0.25, 0.5],
+    'gamma': ['scale', 'auto', 0.01, 0.1, 0.5, 1.0],
+    'ewma_span': [2, 3, 4, 5]
+}
+
+# Griglia Parametri Isolation Forest
+IFOREST_GRID = {
+    'contamination': [0.01, 0.05, 0.1, 0.25, 0.5, 'auto'],
+    'n_estimators': [100, 200, 300],
+    'ewma_span': [2, 3, 4, 5]
+}
+
+def prep_features(df):
+    """Estrazione delle Golden Features (Spazio a 4 dimensioni compatto)"""
     context_cols = [c for c in df.columns if 'Ctx_Pos' in c]
+    
+    df[context_cols] = df[context_cols].apply(lambda row: row.fillna(row.mean()), axis=1)
+    df['Single_Score'] = df['Single_Score'].fillna(df['Single_Score'].mean())
+    
     df['Min_Context'] = df[context_cols].min(axis=1)
+    df['Mean_Context'] = df[context_cols].mean(axis=1)
+    df['Max_Context'] = df[context_cols].max(axis=1)
+    df['Std_Context'] = df[context_cols].std(axis=1).fillna(0)
     
-    # 2. Normalizzazione (Z-Score)
-    df['S_Norm'] = (df['Single_Score'] - df['Single_Score'].mean()) / df['Single_Score'].std()
-    df['C_Norm'] = (df['Min_Context'] - df['Min_Context'].mean()) / df['Min_Context'].std()
-    
-    best_f1, best_w, best_th, best_preds = -1, 0, 0, None
-    best_probs = None
-    
-    # Grid Search sui pesi e soglie
-    for w in np.arange(0.1, 1.0, 0.1):
-        combined_scores = (w * df['S_Norm']) + ((1 - w) * df['C_Norm'])
-        # Invertiamo per comodità: valori più alti = più anomalo
-        anomaly_scores = -combined_scores 
-        
-        thresholds = np.linspace(np.percentile(anomaly_scores, 1), np.percentile(anomaly_scores, 99), 100)
-        
-        for th in thresholds:
-            preds = (anomaly_scores > th).astype(int)
-            current_f1 = f1_score(df['True_Label'], preds, zero_division=0)
-            
-            if current_f1 > best_f1:
-                best_f1 = current_f1
-                best_w = w
-                best_th = th
-                best_preds = preds
-                best_probs = anomaly_scores
+    df['Delta_Single_Min'] = df['Single_Score'] - df['Min_Context']
+    df['Delta_Single_Mean'] = df['Single_Score'] - df['Mean_Context']
 
-    print_report(df['True_Label'], best_preds, best_probs, 
-                 f"1. METODO EURISTICO (Single + Min Context) | Peso Single: {best_w:.1f}")
-    return best_f1
+    df['Contex_Range'] = df['Max_Context'] - df['Min_Context']
 
-def optimize_ml_ensemble(df):
-    """Strategia ML POTENZIATA: Feature Engineering, Bilanciamento e Smoothing"""
-    print("\n" + "-"*60)
-    print("Preparazione Feature Engineering Avanzata...")
+    if 'Ctx_Pos0' in df.columns and 'Ctx_Pos4' in df.columns:
+        df['Time_Gradient'] = df['Ctx_Pos4'] - df['Ctx_Pos0']
+    else:
+        df['Time_Gradient'] = 0.0
+    return df
+
+def run_grid_search_ocsvm(X_val, X_test, y_test):
+    print("\nAvvio Grid Search per One-Class SVM...")
+    keys = list(OCSVM_GRID.keys())
+    combinations = list(itertools.product(*[OCSVM_GRID[k] for k in keys]))
     
-    # 1. Feature Base
-    context_cols = [c for c in df.columns if 'Ctx_Pos' in c]
+    best_results = []
     
-    # 2. Creazione Meta-Features (Feature Engineering)
-    df['Ctx_Min'] = df[context_cols].min(axis=1)
-    df['Ctx_Mean'] = df[context_cols].mean(axis=1)
-    df['Ctx_Std'] = df[context_cols].std(axis=1).fillna(0) # Varianza
-    
-    # Deltas: Quanto il contesto cambia la percezione del pacchetto?
-    df['Delta_Single_Min'] = df['Single_Score'] - df['Ctx_Min']
-    df['Delta_Single_Mean'] = df['Single_Score'] - df['Ctx_Mean']
-    
-    features = ['Single_Score'] + context_cols + ['Ctx_Min', 'Ctx_Mean', 'Ctx_Std', 'Delta_Single_Min', 'Delta_Single_Mean']
-    
-    X = df[features].fillna(df[features].mean())
-    y = df['True_Label'].values
-    
-    # 3. Creazione Classificatore (Più profondo e Bilanciato)
-    # class_weight='balanced' forza il modello a penalizzare pesantemente i Falsi Negativi
-    clf = RandomForestClassifier(
-        n_estimators=100, 
-        max_depth=7, 
-        class_weight='balanced', 
-        random_state=42, 
-        n_jobs=-1
-    )
-    
-    print("Addestramento Meta-Model con Cross-Validation (attendere...)")
-    raw_probs = cross_val_predict(clf, X, y, cv=5, method='predict_proba')[:, 1]
-    
-    # 4. Smoothing Temporale sulle Probabilità (Il segreto degli IDS)
-    # Un attacco raramente avviene in 1 solo pacchetto. Smussiamo le probabilità.
-    print("Applicazione Smoothing Temporale sulle Probabilità (EWMA)...")
-    probs_series = pd.Series(raw_probs)
-    # span=3 crea un effetto memoria leggero sui pacchetti adiacenti
-    smoothed_probs = probs_series.ewm(span=3, adjust=False).mean().values
-    
-    # 5. Tuning della Soglia
-    best_f1, best_th, best_preds = -1, 0, None
-    thresholds = np.linspace(0.01, 0.99, 100)
-    
-    for th in thresholds:
-        preds = (smoothed_probs > th).astype(int)
-        current_f1 = f1_score(y, preds, zero_division=0)
+    for i, combo in enumerate(combinations):
+        params = dict(zip(keys, combo))
         
-        if current_f1 > best_f1:
-            best_f1 = current_f1
-            best_th = th
-            best_preds = preds
+        # 1. Addestramento
+        clf = OneClassSVM(nu=params['nu'], gamma=params['gamma'], kernel='rbf')
+        clf.fit(X_val)
+        
+        # 2. Score Raw (Invertito, alto = anomalia)
+        val_raw = -clf.decision_function(X_val)
+        test_raw = -clf.decision_function(X_test)
+        
+        # 3. Smoothing Temporale
+        val_smooth = pd.Series(val_raw).ewm(span=params['ewma_span'], adjust=False).mean().values
+        test_smooth = pd.Series(test_raw).ewm(span=params['ewma_span'], adjust=False).mean().values
+        
+        # 4. Ricerca Soglia su FPR
+        for fpr in TARGET_FPRS:
+            th = np.percentile(val_smooth, 100.0 - fpr)
+            preds = (test_smooth > th).astype(int)
+            f1 = f1_score(y_test, preds, zero_division=0)
             
-    print_report(y, best_preds, smoothed_probs, 
-                 f"2. METODO ML ENSEMBLE ADVANCED (Features + Balanced + EWMA) | Soglia Prob: {best_th:.2f}")
+            best_results.append({
+                'model': 'OCSVM',
+                'nu': params['nu'],
+                'gamma': params['gamma'],
+                'ewma_span': params['ewma_span'],
+                'val_fpr': fpr,
+                'f1': f1,
+                'preds': preds,
+                'scores': test_smooth
+            })
+            
+        if (i+1) % 10 == 0:
+            print(f"Progresso OCSVM: {i+1}/{len(combinations)} combinazioni testate...")
+            
+    # Ordiniamo e restituiamo i migliori 3
+    return sorted(best_results, key=lambda x: x['f1'], reverse=True)[:3]
+
+def run_grid_search_iforest(X_val, X_test, y_test):
+    print("\nAvvio Grid Search per Isolation Forest...")
+    keys = list(IFOREST_GRID.keys())
+    combinations = list(itertools.product(*[IFOREST_GRID[k] for k in keys]))
     
-    return best_f1
-def main():
-    print(f"Caricamento dati da {INPUT_FILE}...")
+    best_results = []
+    
+    for i, combo in enumerate(combinations):
+        params = dict(zip(keys, combo))
+        
+        clf = IsolationForest(
+            n_estimators=params['n_estimators'], 
+            contamination=params['contamination'], 
+            random_state=42, n_jobs=-1
+        )
+        clf.fit(X_val)
+        
+        val_raw = -clf.decision_function(X_val)
+        test_raw = -clf.decision_function(X_test)
+        
+        val_smooth = pd.Series(val_raw).ewm(span=params['ewma_span'], adjust=False).mean().values
+        test_smooth = pd.Series(test_raw).ewm(span=params['ewma_span'], adjust=False).mean().values
+        
+        for fpr in TARGET_FPRS:
+            th = np.percentile(val_smooth, 100.0 - fpr)
+            preds = (test_smooth > th).astype(int)
+            f1 = f1_score(y_test, preds, zero_division=0)
+            
+            best_results.append({
+                'model': 'IFOREST',
+                'contamination': params['contamination'],
+                'n_estimators': params['n_estimators'],
+                'ewma_span': params['ewma_span'],
+                'val_fpr': fpr,
+                'f1': f1,
+                'preds': preds,
+                'scores': test_smooth
+            })
+            
+        if (i+1) % 10 == 0:
+            print(f"Progresso IForest: {i+1}/{len(combinations)} combinazioni testate...")
+            
+    return sorted(best_results, key=lambda x: x['f1'], reverse=True)[:3]
+
+def print_top_configuration(rank, config, y_test):
+    print(f"\n{'='*75}")
+    print(f" 🏆 TOP {rank} CONFIGURATION: {config['model']}")
+    print(f"{'='*75}")
+    
+    # Stampa parametri in base al modello
+    if config['model'] == 'OCSVM':
+        print(f"Parametri: nu={config['nu']} | gamma={config['gamma']} | EWMA={config['ewma_span']} | Target FPR={config['val_fpr']}%")
+    else:
+        print(f"Parametri: contamination={config['contamination']} | n_estimators={config['n_estimators']} | EWMA={config['ewma_span']} | Target FPR={config['val_fpr']}%")
+        
+    print(classification_report(y_test, config['preds'], digits=4, target_names=["Benign", "Attack"]))
+    cm = confusion_matrix(y_test, config['preds'])
+    print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
+    
     try:
-        df = pd.read_csv(INPUT_FILE)
-    except FileNotFoundError:
-        print("Errore: File non trovato.")
+        print(f"ROC AUC: {roc_auc_score(y_test, config['scores']):.4f}")
+    except ValueError:
+        pass
+
+def main():
+    print("Caricamento Dataset...")
+    try:
+        df_val = pd.read_csv(VAL_FILE)
+        df_test = pd.read_csv(TEST_FILE)
+    except FileNotFoundError as e:
+        print(f"Errore: {e}")
         return
 
-    # Esecuzione dei due metodi
-    f1_euristico = optimize_heuristic_min(df)
-    f1_ml = optimize_ml_ensemble(df)
+    if 'True_Label' in df_val.columns and df_val['True_Label'].sum() > 0:
+        df_val = df_val[df_val['True_Label'] == 0].copy()
 
-    print("\n" + "#"*70)
-    print(" CONCLUSIONE PER IL PAPER SCIENTIFICO")
-    print("#"*70)
-    print("Nel paper puoi confrontare questi approcci per mostrare l'evoluzione:")
-    print(f"- Modello Base (Media Contesti): F1-Score ~ 0.8052 (Tuo risultato iniziale)")
-    print(f"- Ottimizzazione Euristica (Min Context): F1-Score {f1_euristico:.4f}")
-    print(f"- Stacking Ensemble (Machine Learning): F1-Score {f1_ml:.4f}")
+    df_val = prep_features(df_val)
+    df_test = prep_features(df_test)
+
+    features = ['Single_Score', 'Delta_Single_Min', 'Contex_Range', 'Time_Gradient']
+    y_test = df_test['True_Label'].values
+
+    # Robust Scaling
+    scaler = RobustScaler()
+    X_val = scaler.fit_transform(df_val[features].values)
+    X_test = scaler.transform(df_test[features].values)
+
+    # Eseguiamo le Grid Search
+    top_ocsvm = run_grid_search_ocsvm(X_val, X_test, y_test)
+    top_iforest = run_grid_search_iforest(X_val, X_test, y_test)
+
+    # Uniamo i migliori e prendiamo la Top 3 assoluta
+    all_top = sorted(top_ocsvm + top_iforest, key=lambda x: x['f1'], reverse=True)[:3]
+
+    print("\n" + "#"*75)
+    print(" RISULTATI FINALI GRID SEARCH")
+    print("#"*75)
+    
+    for i, config in enumerate(all_top):
+        print_top_configuration(i+1, config, y_test)
 
 if __name__ == "__main__":
     main()

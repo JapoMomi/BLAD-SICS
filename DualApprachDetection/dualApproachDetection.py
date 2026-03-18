@@ -4,7 +4,6 @@ import numpy as np
 import torch.nn.functional as F
 from tqdm import tqdm
 from transformers import AutoTokenizer, T5ForConditionalGeneration
-from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 
 # --- CONFIGURAZIONE ---
 SEQUENCE_LENGTH = 5
@@ -12,11 +11,17 @@ MAX_LENGTH = 512
 SEPARATOR = ' '
 MASK_TOKEN_ID = 258 # <extra_id_0> per ByT5
 
-# Percorsi
+# Percorsi Modelli
 PATH_SINGLE = "/home/spritz/storage/disk0/Master_Thesis/SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned"
 PATH_CONTEXT = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
+
+# Percorsi Dataset Input
+VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt"
-OUTPUT_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
+
+# Percorsi Output CSV
+OUTPUT_VAL_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
+OUTPUT_TEST_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -29,7 +34,7 @@ def hex_to_latin1(hex_str):
     except:
         return ""
 
-def get_single_packet_score(model, tokenizer, packet_hex, window_size=5):
+def get_single_packet_log_prob(model, tokenizer, packet_hex, window_size=5):
     """
     Calcola lo score sintattico (SinglePacket) usando sliding window masking sui byte.
     Eseguito UNA SOLA VOLTA per pacchetto univoco.
@@ -64,38 +69,27 @@ def get_single_packet_score(model, tokenizer, packet_hex, window_size=5):
             
     return np.mean(chunk_scores) if chunk_scores else 0.0
 
-def get_context_scores_batch(model, tokenizer, sequence_hex_str):
-    """
-    Calcola 5 score contestuali (uno per ogni posizione nella sequenza).
-    Logica identica al tuo script: maschera P_i, predici P_i.
-    """
-    hex_packets = sequence_hex_str.strip().split(SEPARATOR)
+def get_context_log_probs(model, tokenizer, sequence_str):
+    """Calcola le 5 log-probabilità per i pacchetti nel loro contesto (modello Context)."""
+    hex_packets = sequence_str.strip().split(SEPARATOR)
     if len(hex_packets) != SEQUENCE_LENGTH:
         return [np.nan] * SEQUENCE_LENGTH
 
-    input_texts, target_texts = [], []
+    input_texts = []
+    target_texts = []
     
-    # Prepariamo i 5 input mascherati (Mask P0, Mask P1, ..., Mask P4)
     for i in range(SEQUENCE_LENGTH):
         masked_packets = hex_packets.copy()
-        masked_packets[i] = "<extra_id_0>" # Masking token placeholder
-        
-        # Input: P0 P1 <extra_id_0> P3 P4
+        masked_packets[i] = "<extra_id_0>"
         input_texts.append(hex_to_latin1(SEPARATOR.join(masked_packets)))
-        
-        # Target: <extra_id_0> P2 <extra_id_1>
         target_texts.append(f"<extra_id_0> {hex_to_latin1(hex_packets[i])} <extra_id_1>")
 
-    # Tokenizzazione Batch
     inputs = tokenizer(input_texts, return_tensors="pt", padding="max_length", truncation=True, max_length=MAX_LENGTH).to(DEVICE)
     targets = tokenizer(target_texts, return_tensors="pt", padding="max_length", truncation=True, max_length=MAX_LENGTH).to(DEVICE)
     
-    scores = []
-    pad_token_id = tokenizer.pad_token_id
-    
-    # Ignoriamo padding e token speciali nel calcolo della media
-    target_mask = (targets.input_ids != pad_token_id) & (targets.input_ids < 256)
+    target_mask = (targets.input_ids != tokenizer.pad_token_id) & (targets.input_ids < 256)
 
+    scores = []
     with torch.no_grad():
         outputs = model(input_ids=inputs.input_ids, attention_mask=inputs.attention_mask, labels=targets.input_ids)
         log_probs = F.log_softmax(outputs.logits, dim=-1)
@@ -105,111 +99,58 @@ def get_context_scores_batch(model, tokenizer, sequence_hex_str):
         
         for k in range(SEQUENCE_LENGTH):
             valid_log_probs = token_log_probs[k][target_mask[k]]
-            if len(valid_log_probs) > 0:
-                scores.append(valid_log_probs.mean().item())
-            else:
-                scores.append(np.nan)
+            scores.append(valid_log_probs.mean().item() if len(valid_log_probs) > 0 else np.nan)
             
-    return scores # Ritorna lista di 5 float
+    return scores
 
-# --- LOGICA DI VOTING ---
-def find_best_threshold_dual(df):
+def process_dataset(filepath, model_single, tok_single, model_context, tok_context, device, desc="Processing"):
     """
-    Trova la soglia ottimale combinando SingleScore e MeanContextScore.
+    Legge il file di dataset, calcola gli score (Single + Context) 
+    e organizza i dati a livello di singolo pacchetto (Packet-Level).
+    Restituisce un DataFrame pandas.
     """
-    y_true = df['True_Label'].values
-    
-    # Calcoliamo lo score contestuale medio (ignorando i NaN dove la finestra non copriva)
-    context_cols = [f'Ctx_Pos{i}' for i in range(SEQUENCE_LENGTH)]
-    df['Avg_Context'] = df[context_cols].mean(axis=1)
-    
-    # Creiamo uno Score Combinato (Somma pesata o semplice media)
-    # Poiché sono Log-Probs (negativi), sommarli è come moltiplicare le probabilità.
-    # Normalizziamo grossolanamente: SingleScore tende ad essere più alto (meno negativo).
-    df['Final_Score'] = df['Single_Score'] + df['Avg_Context']
-    
-    scores = df['Final_Score'].values
-    scores = scores[~np.isnan(scores)]
-    
-    # Cerchiamo la soglia
-    thresholds = np.linspace(np.percentile(scores, 1), np.percentile(scores, 99), 100)
-    best_f1, best_th, best_preds = -1, None, None
-    
-    print("\n🔍 Ricerca soglia ottimale su (Single + Context)...")
-    for th in thresholds:
-        preds = (df['Final_Score'] < th).astype(int)
-        rep = classification_report(y_true, preds, output_dict=True, zero_division=0)
-        f1 = rep['1']['f1-score']
-        
-        if f1 > best_f1:
-            best_f1 = f1
-            best_th = th
-            best_preds = preds
-            
-    return best_f1, best_th, best_preds
+    print(f"\nLettura dataset da {filepath}...")
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
 
-# --- MAIN ---
-if __name__ == "__main__":
-    print(f"Caricamento modelli su {DEVICE}...")
-    
-    # 1. Carica Single Packet Model
-    tok_single = AutoTokenizer.from_pretrained(PATH_SINGLE, local_files_only=True)
-    mod_single = T5ForConditionalGeneration.from_pretrained(PATH_SINGLE, local_files_only=True).to(DEVICE).eval()
-    
-    # 2. Carica Time Context Model
-    tok_context = AutoTokenizer.from_pretrained(PATH_CONTEXT, local_files_only=True) # Usa tokenizer contestuale se diverso, altrimenti ByT5 base è uguale
-    mod_context = T5ForConditionalGeneration.from_pretrained(PATH_CONTEXT, local_files_only=True).to(DEVICE).eval()
-
-    # Registry: Key = Packet Global ID
     packet_registry = {}
 
-    print(f"Lettura {TEST_PATH}...")
-    with open(TEST_PATH, 'r') as f: lines = f.readlines()
-
-    print("Inizio scansione sequenze...")
-    # Usiamo tqdm per progress bar
-    for line_idx, line in tqdm(enumerate(lines), total=len(lines)):
+    for line_idx, line in tqdm(enumerate(lines), total=len(lines), desc=desc):
         line = line.strip()
         if not line: continue
         
         parts = line.split(',')
-        seq_hex_str = parts[0]
-        hex_packets = seq_hex_str.split(SEPARATOR)
+        payload_seq = parts[0]
+        packet_labels = [int(x) for x in parts[1:6]]
         
-        # Labels dei 5 pacchetti nella sequenza corrente
-        labels_in_window = [int(x) for x in parts[1:6]]
+        # 1. Calcolo Score Contestuali (5 score)
+        ctx_scores = get_context_log_probs(model_context, tok_context, payload_seq)
         
-        # 1. Calcola i 5 Context Scores (uno per posizione)
-        ctx_scores = get_context_scores_batch(mod_context, tok_context, seq_hex_str)
+        # 2. Assegnazione ai singoli pacchetti globali
+        hex_packets = payload_seq.split(SEPARATOR)
         
-        # 2. Aggiorna il registry
         for pos in range(SEQUENCE_LENGTH):
-            # Calcolo ID univoco del pacchetto nel flusso
-            # Assumendo sliding window di step 1: il pacchetto 0 della riga 1 è lo stesso della riga 0 pos 1?
-            # Se il dataset è generato da splitter.py con sliding window:
-            # Riga 0: P0, P1, P2, P3, P4
-            # Riga 1: P1, P2, P3, P4, P5
-            # Quindi Global_ID = line_idx + pos
             global_id = line_idx + pos
             
+            # Inizializzazione pacchetto nel registry
             if global_id not in packet_registry:
                 packet_registry[global_id] = {
-                    'hex': hex_packets[pos],
-                    'label': labels_in_window[pos],
-                    'single_score': None,      # Da calcolare
-                    'ctx_scores': [np.nan] * SEQUENCE_LENGTH # [Score quando era in Pos0, Score quando era in Pos1...]
+                    'label': packet_labels[pos], 
+                    'single_score': np.nan, 
+                    'ctx_scores': [np.nan] * SEQUENCE_LENGTH
                 }
-            
-            # Salva lo score contestuale nella posizione relativa corretta
+                
+            # Salva lo score contestuale nella posizione relativa (0-4)
             packet_registry[global_id]['ctx_scores'][pos] = ctx_scores[pos]
             
-            # 3. Calcola Single Score (SOLO SE MANCANTE - Ottimizzazione)
-            if packet_registry[global_id]['single_score'] is None:
-                s_score = get_single_packet_score(mod_single, tok_single, hex_packets[pos])
+            # Calcolo Single Score (lo fa solo una volta per pacchetto)
+            if np.isnan(packet_registry[global_id]['single_score']):
+                target_hex = hex_packets[pos]
+                s_score = get_single_packet_log_prob(model_single, tok_single, target_hex)
                 packet_registry[global_id]['single_score'] = s_score
 
-    # --- Creazione DataFrame Finale ---
-    print("Creazione DataFrame...")
+    # Creazione DataFrame Finale
+    print(f"[{desc}] Creazione DataFrame...")
     data = []
     sorted_ids = sorted(packet_registry.keys())
     
@@ -220,32 +161,49 @@ if __name__ == "__main__":
             'True_Label': entry['label'],
             'Single_Score': entry['single_score']
         }
-        # Aggiungi colonne Ctx_Pos0 ... Ctx_Pos4
         for i in range(SEQUENCE_LENGTH):
             row[f'Ctx_Pos{i}'] = entry['ctx_scores'][i]
         data.append(row)
         
     df = pd.DataFrame(data)
-    
-    # --- Analisi e Prediction ---
-    f1, th, preds = find_best_threshold_dual(df)
-    
-    df['Pred_Label'] = preds
-    
-    print("\n" + "="*60)
-    print(f"REPORT DUAL MODEL (Single + Context)")
-    print(f"Best Threshold (Sum LogProbs): {th:.4f}")
-    print("="*60)
-    print(classification_report(df['True_Label'], df['Pred_Label'], digits=4))
-    
-    cm = confusion_matrix(df['True_Label'], df['Pred_Label'])
-    print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
+    return df
 
-    try:
-        auc_score = roc_auc_score(df['True_Label'], -df['Final_Score'])
-        print(f"AUC: {auc_score:.4f}")
-    except ValueError:
-        print("AUC: Impossibile calcolare (forse una sola classe presente?)")
+# --- MAIN FLOW ---
+
+def main():
+    print(f"Inizializzazione ambiente su {DEVICE}...")
     
-    df.to_csv(OUTPUT_CSV, index=False)
-    print(f"Salvati risultati dettagliati in {OUTPUT_CSV}")
+    # Caricamento Modello SINGLE
+    print("\nCaricamento Modello SINGLE...")
+    tok_single = AutoTokenizer.from_pretrained(PATH_SINGLE, local_files_only=True)
+    model_single = T5ForConditionalGeneration.from_pretrained(PATH_SINGLE, local_files_only=True).to(DEVICE)
+    model_single.eval()
+
+    # Caricamento Modello CONTEXT
+    print("\nCaricamento Modello CONTEXT...")
+    tok_context = AutoTokenizer.from_pretrained(PATH_CONTEXT, local_files_only=True)
+    model_context = T5ForConditionalGeneration.from_pretrained(PATH_CONTEXT, local_files_only=True).to(DEVICE)
+    model_context.eval()
+
+    # --- ELABORAZIONE VALIDATION SET ---
+    print("\n" + "="*50)
+    print(" FASE 1: Estrazione Score per VALIDATION SET")
+    print("="*50)
+    df_val = process_dataset(VAL_PATH, model_single, tok_single, model_context, tok_context, DEVICE, desc="Validation")
+    
+    print(f"Salvataggio Validation in: {OUTPUT_VAL_CSV}")
+    df_val.to_csv(OUTPUT_VAL_CSV, index=False)
+    
+    # --- ELABORAZIONE TEST SET ---
+    print("\n" + "="*50)
+    print(" FASE 2: Estrazione Score per TEST SET")
+    print("="*50)
+    df_test = process_dataset(TEST_PATH, model_single, tok_single, model_context, tok_context, DEVICE, desc="Test")
+    
+    print(f"Salvataggio Test in: {OUTPUT_TEST_CSV}")
+    df_test.to_csv(OUTPUT_TEST_CSV, index=False)
+
+    print("\n✅ Estrazione completata con successo! I dati sono pronti per l'Anomaly Detection Unsupervised.")
+
+if __name__ == "__main__":
+    main()

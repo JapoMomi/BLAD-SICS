@@ -1,0 +1,23 @@
+Inizializzazione ambiente su cuda...
+
+Caricamento Modello SINGLE...
+
+Caricamento Modello CONTEXT...
+
+==================================================
+ FASE 1: Estrazione Score per VALIDATION SET
+==================================================
+
+Lettura dataset da /home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt...
+[Validation] Creazione DataFrame...
+Salvataggio Validation in: /home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv
+
+==================================================
+ FASE 2: Estrazione Score per TEST SET
+==================================================
+
+Lettura dataset da /home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt...
+[Test] Creazione DataFrame...
+Salvataggio Test in: /home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv
+
+✅ Estrazione completata con successo! I dati sono pronti per l'Anomaly Detection Unsupervised.
