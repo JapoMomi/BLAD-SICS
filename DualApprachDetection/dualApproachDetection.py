@@ -75,14 +75,19 @@ def get_context_log_probs(model, tokenizer, sequence_str):
     if len(hex_packets) != SEQUENCE_LENGTH:
         return [np.nan] * SEQUENCE_LENGTH
 
+    # Decodifica tutti i pacchetti da esadecimale a Latin-1 in anticipo
+    latin1_packets = [hex_to_latin1(hp) for hp in hex_packets]
+
     input_texts = []
     target_texts = []
     
     for i in range(SEQUENCE_LENGTH):
-        masked_packets = hex_packets.copy()
+        # Lavoriamo sulla lista di byte già decodificati
+        masked_packets = latin1_packets.copy()
         masked_packets[i] = "<extra_id_0>"
-        input_texts.append(hex_to_latin1(SEPARATOR.join(masked_packets)))
-        target_texts.append(f"<extra_id_0> {hex_to_latin1(hex_packets[i])} <extra_id_1>")
+        
+        input_texts.append(SEPARATOR.join(masked_packets))
+        target_texts.append(f"<extra_id_0> {latin1_packets[i]} <extra_id_1>")
 
     inputs = tokenizer(input_texts, return_tensors="pt", padding="max_length", truncation=True, max_length=MAX_LENGTH).to(DEVICE)
     targets = tokenizer(target_texts, return_tensors="pt", padding="max_length", truncation=True, max_length=MAX_LENGTH).to(DEVICE)
