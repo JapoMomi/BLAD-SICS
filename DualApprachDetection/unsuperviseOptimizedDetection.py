@@ -12,19 +12,19 @@ VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_m
 TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
 
 # Tolleranze FPR da testare sul Validation
-TARGET_FPRS = [0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0]
+TARGET_FPRS = [0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 25.0]
 
 # Griglia Parametri OCSVM
 OCSVM_GRID = {
-    'nu': [0.01, 0.05, 0.1, 0.25, 0.5],
-    'gamma': ['scale', 'auto', 0.01, 0.1, 0.5, 1.0],
+    'nu': [0.01, 0.05, 0.1, 0.15, 0.20, 0.25, 0.5],
+    'gamma': ['scale', 'auto', 0.01, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0],
     'ewma_span': [2, 3, 4, 5]
 }
 
 # Griglia Parametri Isolation Forest
 IFOREST_GRID = {
     'contamination': [0.01, 0.05, 0.1, 0.25, 0.5, 'auto'],
-    'n_estimators': [100, 200, 300],
+    'n_estimators': [100, 200, 300, 400, 500, 1000],
     'ewma_span': [2, 3, 4, 5]
 }
 

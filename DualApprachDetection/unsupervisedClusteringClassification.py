@@ -127,7 +127,7 @@ def run_ml_and_clustering(df_val, df_test, algo_name):
         title = "3. ML: Isolation Forest"
         
     elif algo_name == 'ocsvm':
-        clf = OneClassSVM(nu=0.25, kernel='rbf', gamma='scale')
+        clf = OneClassSVM(nu=0.05, kernel='rbf', gamma=0.1)
         clf.fit(X_val)
         val_scores = -clf.decision_function(X_val)
         test_scores = -clf.decision_function(X_test)

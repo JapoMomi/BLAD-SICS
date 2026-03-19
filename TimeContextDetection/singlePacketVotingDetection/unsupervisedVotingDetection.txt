@@ -1,0 +1,111 @@
+Lettura dei dataset pre-calcolati...
+
+Ricerca della soglia ottimale per SINGOLA STRATEGIA in corso...
+
+======================================================================
+ REPORT COMPLETO (OGNI STRATEGIA CON LA SUA SOGLIA MIGLIORE)
+======================================================================
+
+----------------------------------------
+ Strategia: AT_LEAST_1
+ (Soglia Ottimale: -2.5268 al 3.0% percentile)
+----------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0     0.8992    0.9335    0.9160     32113
+           1     0.7281    0.6301    0.6756      9082
+
+    accuracy                         0.8666     41195
+   macro avg     0.8137    0.7818    0.7958     41195
+weighted avg     0.8615    0.8666    0.8630     41195
+
+Confusion Matrix:
+TP: 5723   | FN: 3359  
+FP: 2137   | TN: 29976 
+ROC AUC: 0.7818
+
+----------------------------------------
+ Strategia: AT_LEAST_2
+ (Soglia Ottimale: -2.5268 al 3.0% percentile)
+----------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0     0.8957    0.9408    0.9177     32113
+           1     0.7455    0.6128    0.6726      9082
+
+    accuracy                         0.8685     41195
+   macro avg     0.8206    0.7768    0.7952     41195
+weighted avg     0.8626    0.8685    0.8637     41195
+
+Confusion Matrix:
+TP: 5565   | FN: 3517  
+FP: 1900   | TN: 30213 
+ROC AUC: 0.7768
+
+----------------------------------------
+ Strategia: AT_LEAST_4
+ (Soglia Ottimale: -1.0221 al 15.0% percentile)
+----------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0     0.9057    0.9826    0.9426     32113
+           1     0.9119    0.6383    0.7510      9082
+
+    accuracy                         0.9067     41195
+   macro avg     0.9088    0.8104    0.8468     41195
+weighted avg     0.9071    0.9067    0.9003     41195
+
+Confusion Matrix:
+TP: 5797   | FN: 3285  
+FP: 560    | TN: 31553 
+ROC AUC: 0.8104
+
+----------------------------------------
+ Strategia: MAJORITY
+ (Soglia Ottimale: -2.5268 al 3.0% percentile)
+----------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0     0.8941    0.9439    0.9183     32113
+           1     0.7530    0.6046    0.6707      9082
+
+    accuracy                         0.8691     41195
+   macro avg     0.8235    0.7743    0.7945     41195
+weighted avg     0.8630    0.8691    0.8637     41195
+
+Confusion Matrix:
+TP: 5491   | FN: 3591  
+FP: 1801   | TN: 30312 
+ROC AUC: 0.7743
+
+----------------------------------------
+ Strategia: STRICT_ALL
+ (Soglia Ottimale: -1.0221 al 15.0% percentile)
+----------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0     0.8988    0.9931    0.9436     32113
+           1     0.9613    0.6047    0.7424      9082
+
+    accuracy                         0.9075     41195
+   macro avg     0.9301    0.7989    0.8430     41195
+weighted avg     0.9126    0.9075    0.8993     41195
+
+Confusion Matrix:
+TP: 5492   | FN: 3590  
+FP: 221    | TN: 31892 
+ROC AUC: 0.7989
+
+======================================================================
+🏆 VINCITORE ASSOLUTO: AT_LEAST_4 (F1-Score: 0.7510)
+======================================================================
