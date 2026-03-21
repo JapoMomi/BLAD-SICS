@@ -34,50 +34,79 @@ TP: 6363  | FN: 2719
 FP: 211   | TN: 31902
 ROC AUC: 0.8600
 
+======================================================================
+3. EURISTICA DELTA PURE (Single_Score - Min_Context)
+======================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.0000    0.0000    0.0000     32113
+      Attack     0.2126    0.9546    0.3477      9082
+
+    accuracy                         0.2105     41195
+   macro avg     0.1063    0.4773    0.1739     41195
+weighted avg     0.0469    0.2105    0.0767     41195
+
+Confusion Matrix:
+TP: 8670  | FN: 412  
+FP: 32113 | TN: 0    
+ROC AUC: 0.4073
+
 ------------------------------------------------------------
 Preparazione Feature Engineering Avanzata...
-Addestramento Meta-Model con Cross-Validation (attendere...)
+
+Addestramento Meta-Model con TimeSeriesSplit (Verifica Overfitting)...
+  Fold 1 -> Train F1: 0.8677 | Validation F1: 0.7625
+  Fold 2 -> Train F1: 0.8153 | Validation F1: 0.7835
+  Fold 3 -> Train F1: 0.7846 | Validation F1: 0.7260
+  Fold 4 -> Train F1: 0.7594 | Validation F1: 0.7624
+  Fold 5 -> Train F1: 0.7640 | Validation F1: 0.7730
+
+Risultato Analisi Overfitting (Soglia grezza 0.5):
+  -> MEDIA TRAIN F1: 0.7982
+  -> MEDIA VAL F1:   0.7615
+  ✅ OTTIMO: Nessun overfitting grave. Il modello generalizza bene!
 
 ======================================================================
-4. ML ENSEMBLE BASE (Senza Smoothing) | Soglia Prob: 0.71
-======================================================================
-              precision    recall  f1-score   support
-
-      Benign     0.9235    0.9942    0.9575     32113
-      Attack     0.9719    0.7088    0.8197      9082
-
-    accuracy                         0.9313     41195
-   macro avg     0.9477    0.8515    0.8886     41195
-weighted avg     0.9342    0.9313    0.9272     41195
-
-Confusion Matrix:
-TP: 6437  | FN: 2645 
-FP: 186   | TN: 31927
-ROC AUC: 0.9600
-
-Applicazione Smoothing Temporale sulle Probabilità (EWMA)...
-
-======================================================================
-5. ML ENSEMBLE ADVANCED (Con Smoothing EWMA) | Soglia Prob: 0.50
+4. ML ENSEMBLE BASE (Out-Of-Fold) | Soglia Prob: 0.60
 ======================================================================
               precision    recall  f1-score   support
 
-      Benign     0.9718    0.9803    0.9760     32113
-      Attack     0.9280    0.8993    0.9134      9082
+      Benign     0.9205    0.9807    0.9497     26381
+      Attack     0.9182    0.7189    0.8064      7944
 
-    accuracy                         0.9624     41195
-   macro avg     0.9499    0.9398    0.9447     41195
-weighted avg     0.9621    0.9624    0.9622     41195
+    accuracy                         0.9201     34325
+   macro avg     0.9194    0.8498    0.8780     34325
+weighted avg     0.9200    0.9201    0.9165     34325
 
 Confusion Matrix:
-TP: 8167  | FN: 915  
-FP: 634   | TN: 31479
-ROC AUC: 0.9781
+TP: 5711  | FN: 2233 
+FP: 509   | TN: 25872
+ROC AUC: 0.9550
+
+Applicazione Smoothing Temporale (EWMA) in modo sicuro sui fold...
+
+======================================================================
+5. ML ENSEMBLE ADVANCED (Out-Of-Fold + EWMA) | Soglia Prob: 0.49
+======================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9602    0.9795    0.9698     26381
+      Attack     0.9271    0.8651    0.8950      7944
+
+    accuracy                         0.9530     34325
+   macro avg     0.9437    0.9223    0.9324     34325
+weighted avg     0.9525    0.9530    0.9525     34325
+
+Confusion Matrix:
+TP: 6872  | FN: 1072 
+FP: 540   | TN: 25841
+ROC AUC: 0.9674
 
 ################################################################################
  RIASSUNTO RISULTATI PER IL PAPER SCIENTIFICO
 ################################################################################
 1. Euristica Base (Single + Mean Context):   F1-Score 0.8111
 2. Euristica Aggressiva (Single + Min Ctx):  F1-Score 0.8129
-4. ML Ensemble Base (Random Forest puro):    F1-Score 0.8197
-5. ML Ensemble Advanced (RF + Smoothing):    F1-Score 0.9134
+3. Euristica Delta Pura (Discrepanza):       F1-Score 0.3477
+4. ML Ensemble Base (Time Series CV):        F1-Score 0.8064
+5. ML Ensemble Advanced (TS-CV + Smoothing): F1-Score 0.8950
