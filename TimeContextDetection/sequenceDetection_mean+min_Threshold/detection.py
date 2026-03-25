@@ -10,7 +10,7 @@ SEQUENCE_LENGTH = 5
 MAX_LENGTH = 512
 SEPARATOR = ' '
 
-MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_{SEQUENCE_LENGTH}_ALLMasked-finetuned"
+MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
 VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt"
 TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt"
 
@@ -144,15 +144,26 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
     final_min_scores = np.array(min_scores_list)
     labels = np.array(labels)
 
-    # --- TEMPORAL SMOOTHING (Solo sulla Media, il Minimo è impulsivo) ---
-    #scores_series = pd.Series(final_avg_scores)
-    #smoothed_avg_scores = scores_series.ewm(span=3, adjust=False).mean().values
-    #final_avg_scores = smoothed_avg_scores
-
     # --- CALCOLO O APPLICAZIONE SOGLIE ---
     if thresholds is None:
         # Siamo in VALIDATION: Dobbiamo calcolare le soglie
         best_avg, best_min = find_best_hybrid_thresholds(labels, final_avg_scores, final_min_scores)
+        
+        # Salvataggio CSV Dettagliato VALIDATION
+        val_df = pd.DataFrame({
+            'Label': labels,
+            'Avg_Score': final_avg_scores,
+            'Min_Score': final_min_scores,
+            'Score_P1': [x[0] for x in detailed_scores_list],
+            'Score_P2': [x[1] for x in detailed_scores_list],
+            'Score_P3': [x[2] for x in detailed_scores_list],
+            'Score_P4': [x[3] for x in detailed_scores_list],
+            'Score_P5': [x[4] for x in detailed_scores_list]
+        })
+        val_path = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results_validation.csv"
+        val_df.to_csv(val_path, index=False)
+        print(f"📁 Validation results saved to: {val_path}")
+        
         return (best_avg, best_min)
     else:
         # Siamo in TEST: Usiamo le soglie passate
@@ -186,19 +197,22 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
         cm = confusion_matrix(labels, final_predictions)
         print(f"Confusion Matrix:\nTP: {cm[1][1]} | FN: {cm[1][0]}\nFP: {cm[0][1]} | TN: {cm[0][0]}")
         
-        # Salvataggio CSV Dettagliato
-        results_df = pd.DataFrame({
+        # Salvataggio CSV Dettagliato TEST
+        test_df = pd.DataFrame({
             'Label': labels,
             'Pred': final_predictions,
             'Avg_Score': final_avg_scores,
-            'Min_Score': final_min_scores, # Aggiunto colonna Min_Score
+            'Min_Score': final_min_scores, 
             'Score_P1': [x[0] for x in detailed_scores_list],
             'Score_P2': [x[1] for x in detailed_scores_list],
             'Score_P3': [x[2] for x in detailed_scores_list],
             'Score_P4': [x[3] for x in detailed_scores_list],
             'Score_P5': [x[4] for x in detailed_scores_list]
         })
-        results_df.to_csv("/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results.csv", index=False)
+        test_path = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results_test.csv"
+        test_df.to_csv(test_path, index=False)
+        print(f"📁 Test results saved to: {test_path}")
+        
         return thresholds
 
 # --- MAIN ---
