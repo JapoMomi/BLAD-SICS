@@ -1,0 +1,191 @@
+Lettura e Feature Engineering dei dataset...
+
+Ricerca delle soglie ottimali Unsupervised in corso...
+
+================================================================================
+ REPORT COMPLETO PER SINGOLA FEATURE ESTRATTA
+================================================================================
+
+--------------------------------------------------
+ Feature: SINGLE_SCORE
+ (Ottimizzata al FPR: 0.5% | Soglia: -1.2274)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.9144    0.9934    0.9523     32113
+      Attack     0.9666    0.6713    0.7923      9082
+
+    accuracy                         0.9224     41195
+   macro avg     0.9405    0.8324    0.8723     41195
+weighted avg     0.9259    0.9224    0.9170     41195
+
+Confusion Matrix:
+[TP: 6097  | FN: 2985 ]
+[FP: 211   | TN: 31902]
+ROC AUC: 0.8607
+
+--------------------------------------------------
+ Feature: MIN_CONTEXT
+ (Ottimizzata al FPR: 5.0% | Soglia: -2.6128)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.8957    0.9415    0.9180     32113
+      Attack     0.7475    0.6122    0.6731      9082
+
+    accuracy                         0.8689     41195
+   macro avg     0.8216    0.7769    0.7956     41195
+weighted avg     0.8630    0.8689    0.8640     41195
+
+Confusion Matrix:
+[TP: 5560  | FN: 3522 ]
+[FP: 1878  | TN: 30235]
+ROC AUC: 0.8410
+
+--------------------------------------------------
+ Feature: MEAN_CONTEXT
+ (Ottimizzata al FPR: 3.0% | Soglia: -1.8027)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.9107    0.9691    0.9390     32113
+      Attack     0.8589    0.6640    0.7489      9082
+
+    accuracy                         0.9019     41195
+   macro avg     0.8848    0.8165    0.8440     41195
+weighted avg     0.8993    0.9019    0.8971     41195
+
+Confusion Matrix:
+[TP: 6030  | FN: 3052 ]
+[FP: 991   | TN: 31122]
+ROC AUC: 0.8522
+
+--------------------------------------------------
+ Feature: MAX_CONTEXT
+ (Ottimizzata al FPR: 1.0% | Soglia: -0.9563)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.9003    0.9907    0.9433     32113
+      Attack     0.9491    0.6119    0.7441      9082
+
+    accuracy                         0.9072     41195
+   macro avg     0.9247    0.8013    0.8437     41195
+weighted avg     0.9110    0.9072    0.8994     41195
+
+Confusion Matrix:
+[TP: 5557  | FN: 3525 ]
+[FP: 298   | TN: 31815]
+ROC AUC: 0.8050
+
+--------------------------------------------------
+ Feature: STD_CONTEXT
+ (Ottimizzata al FPR: 20.0% | Soglia: 0.6826)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.8234    0.7690    0.7953     32113
+      Attack     0.3379    0.4168    0.3732      9082
+
+    accuracy                         0.6914     41195
+   macro avg     0.5806    0.5929    0.5842     41195
+weighted avg     0.7164    0.6914    0.7022     41195
+
+Confusion Matrix:
+[TP: 3785  | FN: 5297 ]
+[FP: 7417  | TN: 24696]
+ROC AUC: 0.7159
+
+--------------------------------------------------
+ Feature: DELTA_SINGLE_MIN
+ (Ottimizzata al FPR: 20.0% | Soglia: 1.3229)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.7746    0.7747    0.7747     32113
+      Attack     0.2030    0.2028    0.2029      9082
+
+    accuracy                         0.6486     41195
+   macro avg     0.4888    0.4888    0.4888     41195
+weighted avg     0.6486    0.6486    0.6486     41195
+
+Confusion Matrix:
+[TP: 1842  | FN: 7240 ]
+[FP: 7234  | TN: 24879]
+ROC AUC: 0.4073
+
+--------------------------------------------------
+ Feature: DELTA_SINGLE_MEAN
+ (Ottimizzata al FPR: 20.0% | Soglia: 0.6123)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.7602    0.7505    0.7553     32113
+      Attack     0.1560    0.1631    0.1595      9082
+
+    accuracy                         0.6210     41195
+   macro avg     0.4581    0.4568    0.4574     41195
+weighted avg     0.6270    0.6210    0.6240     41195
+
+Confusion Matrix:
+[TP: 1481  | FN: 7601 ]
+[FP: 8012  | TN: 24101]
+ROC AUC: 0.2676
+
+--------------------------------------------------
+ Feature: CONTEX_RANGE
+ (Ottimizzata al FPR: 20.0% | Soglia: 1.3683)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.8283    0.7689    0.7975     32113
+      Attack     0.3482    0.4365    0.3874      9082
+
+    accuracy                         0.6956     41195
+   macro avg     0.5883    0.6027    0.5925     41195
+weighted avg     0.7225    0.6956    0.7071     41195
+
+Confusion Matrix:
+[TP: 3964  | FN: 5118 ]
+[FP: 7420  | TN: 24693]
+ROC AUC: 0.7246
+
+--------------------------------------------------
+ Feature: TIME_GRADIENT
+ (Ottimizzata al FPR: 15.0% | Soglia: 0.0587)
+--------------------------------------------------
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.8807    0.8601    0.8703     32113
+      Attack     0.5432    0.5882    0.5648      9082
+
+    accuracy                         0.8002     41195
+   macro avg     0.7120    0.7242    0.7176     41195
+weighted avg     0.8063    0.8002    0.8030     41195
+
+Confusion Matrix:
+[TP: 5342  | FN: 3740 ]
+[FP: 4492  | TN: 27621]
+ROC AUC: 0.8024
+
+================================================================================
+ 🏆 FEATURE VINCITRICE: SINGLE_SCORE (F1-Score: 0.7923)
+================================================================================
