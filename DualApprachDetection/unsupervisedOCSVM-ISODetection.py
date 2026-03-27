@@ -7,6 +7,8 @@ from sklearn.preprocessing import RobustScaler
 import itertools
 import warnings
 
+warnings.filterwarnings('ignore')
+
 # --- CONFIGURAZIONE ---
 VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
 TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
@@ -29,12 +31,18 @@ IFOREST_GRID = {
 }
 
 def prep_features(df):
-    """Estrazione delle Golden Features (Spazio a 4 dimensioni compatto)"""
+    """Estrazione delle Golden Features (Ora include Min_Single_Score)"""
     context_cols = [c for c in df.columns if 'Ctx_Pos' in c]
     
+    # Pulizia Base
     df[context_cols] = df[context_cols].apply(lambda row: row.fillna(row.mean()), axis=1)
     df['Single_Score'] = df['Single_Score'].fillna(df['Single_Score'].mean())
     
+    # Aggiunta sicurezza per la nuova colonna Min_Single_Score
+    if 'Min_Single_Score' in df.columns:
+        df['Min_Single_Score'] = df['Min_Single_Score'].fillna(df['Min_Single_Score'].mean())
+    
+    # Calcolo Features Derivate
     df['Min_Context'] = df[context_cols].min(axis=1)
     df['Mean_Context'] = df[context_cols].mean(axis=1)
     df['Max_Context'] = df[context_cols].max(axis=1)
@@ -49,6 +57,7 @@ def prep_features(df):
         df['Time_Gradient'] = df['Ctx_Pos4'] - df['Ctx_Pos0']
     else:
         df['Time_Gradient'] = 0.0
+        
     return df
 
 def run_grid_search_ocsvm(X_val, X_test, y_test):
@@ -93,8 +102,8 @@ def run_grid_search_ocsvm(X_val, X_test, y_test):
         if (i+1) % 10 == 0:
             print(f"Progresso OCSVM: {i+1}/{len(combinations)} combinazioni testate...")
             
-    # Ordiniamo e restituiamo i migliori 3
-    return sorted(best_results, key=lambda x: x['f1'], reverse=True)[:3]
+    # Restituiamo tutta la lista ordinata per estrarre poi il migliore in assoluto
+    return sorted(best_results, key=lambda x: x['f1'], reverse=True)
 
 def run_grid_search_iforest(X_val, X_test, y_test):
     print("\nAvvio Grid Search per Isolation Forest...")
@@ -138,11 +147,11 @@ def run_grid_search_iforest(X_val, X_test, y_test):
         if (i+1) % 10 == 0:
             print(f"Progresso IForest: {i+1}/{len(combinations)} combinazioni testate...")
             
-    return sorted(best_results, key=lambda x: x['f1'], reverse=True)[:3]
+    return sorted(best_results, key=lambda x: x['f1'], reverse=True)
 
-def print_top_configuration(rank, config, y_test):
+def print_top_configuration(model_title, config, y_test):
     print(f"\n{'='*75}")
-    print(f" 🏆 TOP {rank} CONFIGURATION: {config['model']}")
+    print(f" 🏆 TOP CONFIGURATION: {model_title}")
     print(f"{'='*75}")
     
     # Stampa parametri in base al modello
@@ -175,7 +184,15 @@ def main():
     df_val = prep_features(df_val)
     df_test = prep_features(df_test)
 
-    features = ['Single_Score', 'Delta_Single_Min', 'Contex_Range', 'Time_Gradient']
+    # --- AGGIUNTA MIN_SINGLE_SCORE ALLE FEATURES ---
+    features = ['Single_Score', 'Min_Single_Score', 'Delta_Single_Min', 'Contex_Range', 'Time_Gradient']
+    
+    # Controllo rapido per evitare crash se il CSV vecchio non avesse la colonna
+    for f in features:
+        if f not in df_val.columns:
+            print(f"⚠️ Attenzione: la feature '{f}' non è presente nel dataset. Controlla il CSV.")
+            return
+
     y_test = df_test['True_Label'].values
 
     # Robust Scaling
@@ -184,18 +201,20 @@ def main():
     X_test = scaler.transform(df_test[features].values)
 
     # Eseguiamo le Grid Search
-    top_ocsvm = run_grid_search_ocsvm(X_val, X_test, y_test)
-    top_iforest = run_grid_search_iforest(X_val, X_test, y_test)
+    top_ocsvm_list = run_grid_search_ocsvm(X_val, X_test, y_test)
+    top_iforest_list = run_grid_search_iforest(X_val, X_test, y_test)
 
-    # Uniamo i migliori e prendiamo la Top 3 assoluta
-    all_top = sorted(top_ocsvm + top_iforest, key=lambda x: x['f1'], reverse=True)[:3]
+    # Estraiamo solo il numero 1 assoluto per ciascun modello
+    best_ocsvm = top_ocsvm_list[0]
+    best_iforest = top_iforest_list[0]
 
+    # Stampa finale ben delineata
     print("\n" + "#"*75)
-    print(" RISULTATI FINALI GRID SEARCH")
+    print(" RISULTATI FINALI GRID SEARCH: VINCITORI ASSOLUTI")
     print("#"*75)
     
-    for i, config in enumerate(all_top):
-        print_top_configuration(i+1, config, y_test)
+    print_top_configuration("ONE-CLASS SVM", best_ocsvm, y_test)
+    print_top_configuration("ISOLATION FOREST", best_iforest, y_test)
 
 if __name__ == "__main__":
     main()

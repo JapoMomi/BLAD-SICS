@@ -44,59 +44,41 @@ Progresso IForest: 130/144 combinazioni testate...
 Progresso IForest: 140/144 combinazioni testate...
 
 ###########################################################################
- RISULTATI FINALI GRID SEARCH
+ RISULTATI FINALI GRID SEARCH: VINCITORI ASSOLUTI
 ###########################################################################
 
 ===========================================================================
- 🏆 TOP 1 CONFIGURATION: OCSVM
-===========================================================================
-Parametri: nu=0.05 | gamma=0.1 | EWMA=2 | Target FPR=1.0%
-              precision    recall  f1-score   support
-
-      Benign     0.9505    0.9334    0.9419     32113
-      Attack     0.7785    0.8281    0.8025      9082
-
-    accuracy                         0.9102     41195
-   macro avg     0.8645    0.8807    0.8722     41195
-weighted avg     0.9126    0.9102    0.9111     41195
-
-Confusion Matrix:
-[TP: 7521  | FN: 1561 ]
-[FP: 2140  | TN: 29973]
-ROC AUC: 0.9453
-
-===========================================================================
- 🏆 TOP 2 CONFIGURATION: OCSVM
-===========================================================================
-Parametri: nu=0.05 | gamma=0.1 | EWMA=3 | Target FPR=0.5%
-              precision    recall  f1-score   support
-
-      Benign     0.9480    0.9354    0.9416     32113
-      Attack     0.7817    0.8184    0.7996      9082
-
-    accuracy                         0.9096     41195
-   macro avg     0.8648    0.8769    0.8706     41195
-weighted avg     0.9113    0.9096    0.9103     41195
-
-Confusion Matrix:
-[TP: 7433  | FN: 1649 ]
-[FP: 2076  | TN: 30037]
-ROC AUC: 0.9394
-
-===========================================================================
- 🏆 TOP 3 CONFIGURATION: OCSVM
+ 🏆 TOP CONFIGURATION: ONE-CLASS SVM
 ===========================================================================
 Parametri: nu=0.05 | gamma=0.05 | EWMA=3 | Target FPR=1.0%
               precision    recall  f1-score   support
 
-      Benign     0.9436    0.9394    0.9415     32113
-      Attack     0.7892    0.8016    0.7953      9082
+      Benign     0.9588    0.9331    0.9458     32113
+      Attack     0.7839    0.8584    0.8195      9082
 
-    accuracy                         0.9090     41195
-   macro avg     0.8664    0.8705    0.8684     41195
-weighted avg     0.9096    0.9090    0.9093     41195
+    accuracy                         0.9166     41195
+   macro avg     0.8714    0.8957    0.8826     41195
+weighted avg     0.9203    0.9166    0.9179     41195
 
 Confusion Matrix:
-[TP: 7280  | FN: 1802 ]
-[FP: 1945  | TN: 30168]
-ROC AUC: 0.9335
+[TP: 7796  | FN: 1286 ]
+[FP: 2149  | TN: 29964]
+ROC AUC: 0.9420
+
+===========================================================================
+ 🏆 TOP CONFIGURATION: ISOLATION FOREST
+===========================================================================
+Parametri: contamination=0.01 | n_estimators=100 | EWMA=2 | Target FPR=0.5%
+              precision    recall  f1-score   support
+
+      Benign     0.9235    0.9848    0.9532     32113
+      Attack     0.9299    0.7114    0.8061      9082
+
+    accuracy                         0.9246     41195
+   macro avg     0.9267    0.8481    0.8796     41195
+weighted avg     0.9249    0.9246    0.9207     41195
+
+Confusion Matrix:
+[TP: 6461  | FN: 2621 ]
+[FP: 487   | TN: 31626]
+ROC AUC: 0.8984

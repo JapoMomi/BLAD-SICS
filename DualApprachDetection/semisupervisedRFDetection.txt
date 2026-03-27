@@ -34,26 +34,43 @@ TP: 6363  | FN: 2719
 FP: 211   | TN: 31902
 ROC AUC: 0.8600
 
-------------------------------------------------------------
-Preparazione Feature Engineering Avanzata...
-Addestramento Meta-Model con Cross-Validation (attendere...)
-
 ======================================================================
-4. ML ENSEMBLE BASE (Senza Smoothing) | Soglia Prob: 0.71
+3. EURISTICA ESTREMA (Min_Single + Min Context) | Peso Min_Single: 0.7
 ======================================================================
               precision    recall  f1-score   support
 
-      Benign     0.9235    0.9942    0.9575     32113
-      Attack     0.9719    0.7088    0.8197      9082
+      Benign     0.9264    0.9917    0.9579     32113
+      Attack     0.9610    0.7212    0.8240      9082
 
-    accuracy                         0.9313     41195
-   macro avg     0.9477    0.8515    0.8886     41195
-weighted avg     0.9342    0.9313    0.9272     41195
+    accuracy                         0.9321     41195
+   macro avg     0.9437    0.8565    0.8910     41195
+weighted avg     0.9340    0.9321    0.9284     41195
 
 Confusion Matrix:
-TP: 6437  | FN: 2645 
-FP: 186   | TN: 31927
-ROC AUC: 0.9600
+TP: 6550  | FN: 2532 
+FP: 266   | TN: 31847
+ROC AUC: 0.8619
+
+------------------------------------------------------------
+Preparazione Feature Engineering Avanzata (ML)...
+Addestramento Meta-Model con Cross-Validation (attendere...)
+
+======================================================================
+4. ML ENSEMBLE BASE (Senza Smoothing) | Soglia Prob: 0.73
+======================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9249    0.9962    0.9592     32113
+      Attack     0.9814    0.7140    0.8266      9082
+
+    accuracy                         0.9340     41195
+   macro avg     0.9532    0.8551    0.8929     41195
+weighted avg     0.9374    0.9340    0.9300     41195
+
+Confusion Matrix:
+TP: 6485  | FN: 2597 
+FP: 123   | TN: 31990
+ROC AUC: 0.9612
 
 Applicazione Smoothing Temporale sulle Probabilità (EWMA)...
 
@@ -62,22 +79,23 @@ Applicazione Smoothing Temporale sulle Probabilità (EWMA)...
 ======================================================================
               precision    recall  f1-score   support
 
-      Benign     0.9718    0.9803    0.9760     32113
-      Attack     0.9280    0.8993    0.9134      9082
+      Benign     0.9750    0.9832    0.9791     32113
+      Attack     0.9389    0.9110    0.9248      9082
 
-    accuracy                         0.9624     41195
-   macro avg     0.9499    0.9398    0.9447     41195
-weighted avg     0.9621    0.9624    0.9622     41195
+    accuracy                         0.9673     41195
+   macro avg     0.9570    0.9471    0.9520     41195
+weighted avg     0.9671    0.9673    0.9671     41195
 
 Confusion Matrix:
-TP: 8167  | FN: 915  
-FP: 634   | TN: 31479
-ROC AUC: 0.9781
+TP: 8274  | FN: 808  
+FP: 538   | TN: 31575
+ROC AUC: 0.9796
 
 ################################################################################
  RIASSUNTO RISULTATI PER IL PAPER SCIENTIFICO
 ################################################################################
-1. Euristica Base (Single + Mean Context):   F1-Score 0.8111
+1. Euristica Base (Single + Mean Ctx):       F1-Score 0.8111
 2. Euristica Aggressiva (Single + Min Ctx):  F1-Score 0.8129
-4. ML Ensemble Base (Random Forest puro):    F1-Score 0.8197
-5. ML Ensemble Advanced (RF + Smoothing):    F1-Score 0.9134
+3. Euristica Estrema (Min_Single + Min Ctx): F1-Score 0.8240
+4. ML Ensemble Base (Random Forest puro):    F1-Score 0.8266
+5. ML Ensemble Advanced (RF + Smoothing):    F1-Score 0.9248

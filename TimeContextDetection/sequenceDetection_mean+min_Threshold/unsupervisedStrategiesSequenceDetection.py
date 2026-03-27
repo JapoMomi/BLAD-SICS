@@ -1,9 +1,6 @@
 import pandas as pd
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score
-import warnings
-
-warnings.filterwarnings('ignore')
 
 # --- CONFIGURAZIONE ---
 VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results_validation.csv"

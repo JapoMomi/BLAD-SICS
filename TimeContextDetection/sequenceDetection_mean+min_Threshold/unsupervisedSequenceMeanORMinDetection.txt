@@ -1,19 +1,46 @@
 Caricamento dei risultati della Sequence Detection (Unsupervised)...
 
-Ricerca delle soglie ibride (Avg OR Min) basate sul Validation Set...
+Ricerca delle soglie basate sul Validation Set...
 Filtro di persistenza temporale: 3 step
- -> Tolleranza FPR:  0.1% | Th_Avg:  -1.1045 | Th_Min:  -3.4802 | F1 Test: 0.6035
- -> Tolleranza FPR:  0.5% | Th_Avg:  -0.9630 | Th_Min:  -3.3295 | F1 Test: 0.6670
- -> Tolleranza FPR:  1.0% | Th_Avg:  -0.9017 | Th_Min:  -3.2431 | F1 Test: 0.7036
- -> Tolleranza FPR:  2.0% | Th_Avg:  -0.8530 | Th_Min:  -3.1278 | F1 Test: 0.7357
- -> Tolleranza FPR:  3.0% | Th_Avg:  -0.8167 | Th_Min:  -3.0536 | F1 Test: 0.7544
- -> Tolleranza FPR:  5.0% | Th_Avg:  -0.7743 | Th_Min:  -2.9281 | F1 Test: 0.7728
- -> Tolleranza FPR: 10.0% | Th_Avg:  -0.7071 | Th_Min:  -2.6505 | F1 Test: 0.8072
- -> Tolleranza FPR: 15.0% | Th_Avg:  -0.6564 | Th_Min:  -2.4282 | F1 Test: 0.8233
- -> Tolleranza FPR: 20.0% | Th_Avg:  -0.6043 | Th_Min:  -2.2322 | F1 Test: 0.8352
 
 ===========================================================================
-MIGLIOR RISULTATO SEQUENCE UNSUPERVISED (Ottimizzato per FPR: 20.0%)
+1. STRATEGIA 'SOLO MEDIA' (Ottimizzata per FPR: 20.0%)
+===========================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.7681    0.9222    0.8381     20980
+      Attack     0.8980    0.7109    0.7936     20211
+
+    accuracy                         0.8186     41191
+   macro avg     0.8330    0.8166    0.8159     41191
+weighted avg     0.8318    0.8186    0.8163     41191
+
+Confusion Matrix:
+[TP: 14369 | FN: 5842 ]
+[FP: 1632  | TN: 19348]
+ROC AUC (su Avg_Score): 0.8927
+ROC AUC (su Min_Score): 0.8614
+
+===========================================================================
+2. STRATEGIA 'SOLO MINIMO' (Ottimizzata per FPR: 20.0%)
+===========================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.7464    0.9086    0.8196     20980
+      Attack     0.8775    0.6795    0.7659     20211
+
+    accuracy                         0.7962     41191
+   macro avg     0.8120    0.7941    0.7927     41191
+weighted avg     0.8107    0.7962    0.7932     41191
+
+Confusion Matrix:
+[TP: 13734 | FN: 6477 ]
+[FP: 1917  | TN: 19063]
+ROC AUC (su Avg_Score): 0.8927
+ROC AUC (su Min_Score): 0.8614
+
+===========================================================================
+3. STRATEGIA 'IBRIDA [Avg OR Min]' (Ottimizzata per FPR: 20.0%)
 ===========================================================================
               precision    recall  f1-score   support
 
@@ -29,3 +56,10 @@ Confusion Matrix:
 [FP: 2376  | TN: 18604]
 ROC AUC (su Avg_Score): 0.8927
 ROC AUC (su Min_Score): 0.8614
+
+######################################################################
+ CLASSIFICA FINALE F1-SCORE (SEQUENCE DETECTION)
+######################################################################
+ 🏆 Ibrida (Media OR Minimo) : 0.8352
+ 2. Solo Media               : 0.7936
+ 3. Solo Minimo              : 0.7659

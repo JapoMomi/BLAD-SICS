@@ -9,7 +9,7 @@ INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual
 
 def print_report(y_true, y_pred, y_probs, title):
     print(f"\n{'='*70}\n{title}\n{'='*70}")
-    print(classification_report(y_true, y_pred, digits=4, target_names=["Benign", "Attack"]))
+    print(classification_report(y_true, y_pred, digits=4, target_names=["Benign", "Attack"], zero_division=0))
     cm = confusion_matrix(y_true, y_pred)
     print("Confusion Matrix:")
     print(f"TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}")
@@ -18,7 +18,7 @@ def print_report(y_true, y_pred, y_probs, title):
         print(f"ROC AUC: {roc_auc_score(y_true, y_probs):.4f}")
 
 def optimize_heuristic_mean(df):
-    """Strategia Euristica 1: Z-Score sulla Media dei Contesti"""
+    """Strategia Euristica 1: Z-Score sulla Media dei Contesti e Single Score Base"""
     context_cols = [c for c in df.columns if 'Ctx_Pos' in c]
     df['Mean_Context'] = df[context_cols].mean(axis=1)
     
@@ -49,7 +49,7 @@ def optimize_heuristic_mean(df):
     return best_f1
 
 def optimize_heuristic_min(df):
-    """Strategia Euristica 2: Z-Score sul Minimo dei Contesti"""
+    """Strategia Euristica 2: Z-Score sul Minimo dei Contesti e Single Score Base"""
     context_cols = [c for c in df.columns if 'Ctx_Pos' in c]
     df['Min_Context'] = df[context_cols].min(axis=1)
     
@@ -79,19 +79,60 @@ def optimize_heuristic_min(df):
                  f"2. EURISTICA AGGRESSIVA (Single + Min Context) | Peso Single: {best_w:.1f}")
     return best_f1
 
+def optimize_heuristic_minsingle(df):
+    """Strategia Euristica 3: Z-Score sul MIN_Single_Score e Minimo dei Contesti"""
+    if 'Min_Single_Score' not in df.columns:
+        print("\n[!] Colonna 'Min_Single_Score' non trovata. Salto Euristica 3.")
+        return 0.0
+
+    context_cols = [c for c in df.columns if 'Ctx_Pos' in c]
+    df['Min_Context'] = df[context_cols].min(axis=1)
+    df['Min_Single_Score'] = df['Min_Single_Score'].fillna(df['Min_Single_Score'].mean())
+    
+    df['S_Norm'] = (df['Min_Single_Score'] - df['Min_Single_Score'].mean()) / df['Min_Single_Score'].std()
+    df['C_Norm'] = (df['Min_Context'] - df['Min_Context'].mean()) / df['Min_Context'].std()
+    
+    best_f1, best_w, best_preds = -1, 0, None
+    best_probs = None
+    
+    for w in np.arange(0.1, 1.0, 0.1):
+        combined_scores = (w * df['S_Norm']) + ((1 - w) * df['C_Norm'])
+        anomaly_scores = -combined_scores 
+        
+        thresholds = np.linspace(np.percentile(anomaly_scores, 1), np.percentile(anomaly_scores, 99), 100)
+        
+        for th in thresholds:
+            preds = (anomaly_scores > th).astype(int)
+            current_f1 = f1_score(df['True_Label'], preds, zero_division=0)
+            
+            if current_f1 > best_f1:
+                best_f1 = current_f1
+                best_w = w
+                best_preds = preds
+                best_probs = anomaly_scores
+
+    print_report(df['True_Label'], best_preds, best_probs, 
+                 f"3. EURISTICA ESTREMA (Min_Single + Min Context) | Peso Min_Single: {best_w:.1f}")
+    return best_f1
+
 def run_ml_ensembles(df):
-    """Strategie ML: Esegue sia la versione Base che quella con Smoothing"""
+    """Strategie ML: Esegue sia la versione Base che quella con Smoothing, includendo Min_Single_Score"""
     print("\n" + "-"*60)
-    print("Preparazione Feature Engineering Avanzata...")
+    print("Preparazione Feature Engineering Avanzata (ML)...")
     
     context_cols = [c for c in df.columns if 'Ctx_Pos' in c]
     df['Ctx_Min'] = df[context_cols].min(axis=1)
     df['Ctx_Mean'] = df[context_cols].mean(axis=1)
     df['Ctx_Std'] = df[context_cols].std(axis=1).fillna(0)
+    
     df['Delta_Single_Min'] = df['Single_Score'] - df['Ctx_Min']
     df['Delta_Single_Mean'] = df['Single_Score'] - df['Ctx_Mean']
     
+    # Feature di base
     features = ['Single_Score'] + context_cols + ['Ctx_Min', 'Ctx_Mean', 'Ctx_Std', 'Delta_Single_Min', 'Delta_Single_Mean']
+    
+    df['Min_Single_Score'] = df['Min_Single_Score'].fillna(df['Min_Single_Score'].mean())
+    features.extend(['Min_Single_Score'])
     
     X = df[features].fillna(df[features].mean())
     y = df['True_Label'].values
@@ -114,7 +155,7 @@ def run_ml_ensembles(df):
             best_preds_base = preds
             
     print_report(y, best_preds_base, raw_probs, 
-                 f"3. ML ENSEMBLE BASE (Senza Smoothing) | Soglia Prob: {best_th_base:.2f}")
+                 f"4. ML ENSEMBLE BASE (Senza Smoothing) | Soglia Prob: {best_th_base:.2f}")
 
     # --- 5. ML ENSEMBLE ADVANCED (CON SMOOTHING) ---
     print("\nApplicazione Smoothing Temporale sulle Probabilità (EWMA)...")
@@ -132,7 +173,7 @@ def run_ml_ensembles(df):
             best_preds_adv = preds
             
     print_report(y, best_preds_adv, smoothed_probs, 
-                 f"4. ML ENSEMBLE ADVANCED (Con Smoothing EWMA) | Soglia Prob: {best_th_adv:.2f}")
+                 f"5. ML ENSEMBLE ADVANCED (Con Smoothing EWMA) | Soglia Prob: {best_th_adv:.2f}")
     
     return best_f1_base, best_f1_adv
 
@@ -141,21 +182,23 @@ def main():
     try:
         df = pd.read_csv(INPUT_FILE)
     except FileNotFoundError:
-        print("Errore: File non trovato.")
+        print("Errore: File non trovato. Verifica il percorso.")
         return
 
     # Esecuzione di tutte le strategie
     f1_mean = optimize_heuristic_mean(df.copy())
     f1_min = optimize_heuristic_min(df.copy())
+    f1_minsingle = optimize_heuristic_minsingle(df.copy())
     f1_ml_base, f1_ml_adv = run_ml_ensembles(df.copy())
 
     print("\n" + "#"*80)
     print(" RIASSUNTO RISULTATI PER IL PAPER SCIENTIFICO")
     print("#"*80)
-    print(f"1. Euristica Base (Single + Mean Context):   F1-Score {f1_mean:.4f}")
+    print(f"1. Euristica Base (Single + Mean Ctx):       F1-Score {f1_mean:.4f}")
     print(f"2. Euristica Aggressiva (Single + Min Ctx):  F1-Score {f1_min:.4f}")
-    print(f"3. ML Ensemble Base (Random Forest puro):    F1-Score {f1_ml_base:.4f}")
-    print(f"4. ML Ensemble Advanced (RF + Smoothing):    F1-Score {f1_ml_adv:.4f}")
+    print(f"3. Euristica Estrema (Min_Single + Min Ctx): F1-Score {f1_minsingle:.4f}")
+    print(f"4. ML Ensemble Base (Random Forest puro):    F1-Score {f1_ml_base:.4f}")
+    print(f"5. ML Ensemble Advanced (RF + Smoothing):    F1-Score {f1_ml_adv:.4f}")
 
 if __name__ == "__main__":
     main()

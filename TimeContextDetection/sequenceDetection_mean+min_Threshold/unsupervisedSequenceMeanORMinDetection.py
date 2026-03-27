@@ -71,38 +71,72 @@ def main():
     test_avg = df_test['Avg_Score'].values
     test_min = df_test['Min_Score'].values
 
-    best_f1 = -1
-    best_fpr = 0
-    best_th_avg = 0
-    best_th_min = 0
-    best_preds = None
+    # Dizionari per tracciare i risultati migliori di ogni strategia
+    best_avg = {'f1': -1, 'fpr': 0, 'th': 0, 'preds': None}
+    best_min = {'f1': -1, 'fpr': 0, 'th': 0, 'preds': None}
+    best_hybrid = {'f1': -1, 'fpr': 0, 'th_avg': 0, 'th_min': 0, 'preds': None}
 
-    print(f"\nRicerca delle soglie ibride (Avg OR Min) basate sul Validation Set...")
+    print(f"\nRicerca delle soglie basate sul Validation Set...")
     print(f"Filtro di persistenza temporale: {PERSISTENCE_WINDOW} step")
     
     for fpr in TARGET_FPRS:
-        # Troviamo il percentile corretto sul validation (FPR% dal fondo)
+        # Troviamo i percentili corretti sul validation (FPR% dal fondo)
         th_avg = np.percentile(val_sani_avg, fpr)
         th_min = np.percentile(val_sani_min, fpr)
         
-        # Logica Ibrida: Allarme se la media della sequenza è bassa OR il minimo è molto basso
-        raw_preds = ((test_avg < th_avg) | (test_min < th_min)).astype(int)
+        # Generiamo le raw predictions per le 3 strategie
+        raw_preds_avg = (test_avg < th_avg).astype(int)
+        raw_preds_min = (test_min < th_min).astype(int)
+        raw_preds_hybrid = ((test_avg < th_avg) | (test_min < th_min)).astype(int)
         
-        # Applichiamo la persistenza (la tua stessa logica)
-        final_preds = apply_persistence_filter(raw_preds, window=PERSISTENCE_WINDOW)
+        # Applichiamo la persistenza a tutte
+        final_preds_avg = apply_persistence_filter(raw_preds_avg, window=PERSISTENCE_WINDOW)
+        final_preds_min = apply_persistence_filter(raw_preds_min, window=PERSISTENCE_WINDOW)
+        final_preds_hybrid = apply_persistence_filter(raw_preds_hybrid, window=PERSISTENCE_WINDOW)
         
-        current_f1 = f1_score(y_test, final_preds, zero_division=0)
+        # Calcoliamo gli F1-Score
+        f1_avg = f1_score(y_test, final_preds_avg, zero_division=0)
+        f1_min = f1_score(y_test, final_preds_min, zero_division=0)
+        f1_hybrid = f1_score(y_test, final_preds_hybrid, zero_division=0)
         
-        print(f" -> Tolleranza FPR: {fpr:>4.1f}% | Th_Avg: {th_avg:>8.4f} | Th_Min: {th_min:>8.4f} | F1 Test: {current_f1:.4f}")
-        
-        if current_f1 > best_f1:
-            best_f1 = current_f1
-            best_fpr = fpr
-            best_th_avg = th_avg
-            best_th_min = th_min
-            best_preds = final_preds
+        # --- Aggiornamento dei record migliori ---
+        if f1_avg > best_avg['f1']:
+            best_avg.update({'f1': f1_avg, 'fpr': fpr, 'th': th_avg, 'preds': final_preds_avg})
+            
+        if f1_min > best_min['f1']:
+            best_min.update({'f1': f1_min, 'fpr': fpr, 'th': th_min, 'preds': final_preds_min})
+            
+        if f1_hybrid > best_hybrid['f1']:
+            best_hybrid.update({'f1': f1_hybrid, 'fpr': fpr, 'th_avg': th_avg, 'th_min': th_min, 'preds': final_preds_hybrid})
 
-    print_report(y_test, best_preds, test_avg, test_min, f"MIGLIOR RISULTATO SEQUENCE UNSUPERVISED (Ottimizzato per FPR: {best_fpr}%)")
+    # --- STAMPA DEI REPORT FINALI ---
+    print_report(y_test, best_avg['preds'], test_avg, test_min, 
+                 f"1. STRATEGIA 'SOLO MEDIA' (Ottimizzata per FPR: {best_avg['fpr']}%)")
+                 
+    print_report(y_test, best_min['preds'], test_avg, test_min, 
+                 f"2. STRATEGIA 'SOLO MINIMO' (Ottimizzata per FPR: {best_min['fpr']}%)")
+                 
+    print_report(y_test, best_hybrid['preds'], test_avg, test_min, 
+                 f"3. STRATEGIA 'IBRIDA [Avg OR Min]' (Ottimizzata per FPR: {best_hybrid['fpr']}%)")
+
+    # --- CLASSIFICA ---
+    print("\n" + "#"*70)
+    print(" CLASSIFICA FINALE F1-SCORE (SEQUENCE DETECTION)")
+    print("#"*70)
+    
+    classifica = [
+        ("Solo Media", best_avg['f1']),
+        ("Solo Minimo", best_min['f1']),
+        ("Ibrida (Media OR Minimo)", best_hybrid['f1'])
+    ]
+    # Ordiniamo dal migliore al peggiore
+    classifica.sort(key=lambda x: x[1], reverse=True)
+    
+    for i, (nome, punteggio) in enumerate(classifica, 1):
+        if i == 1:
+            print(f" 🏆 {nome:<25}: {punteggio:.4f}")
+        else:
+            print(f" {i}. {nome:<25}: {punteggio:.4f}")
 
 if __name__ == "__main__":
     main()

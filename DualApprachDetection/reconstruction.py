@@ -9,7 +9,7 @@ from transformers import AutoTokenizer, T5ForConditionalGeneration
 SEQUENCE_LENGTH = 5
 MAX_LENGTH = 512
 SEPARATOR = ' '
-MASK_TOKEN_ID = 258 # <extra_id_0> per ByT5
+MASK_TOKEN_ID = 258 # <extra_id_0> per ByT5 [cite: 2026-01-07]
 
 # Percorsi Modelli
 PATH_SINGLE = "/home/spritz/storage/disk0/Master_Thesis/SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned"
@@ -38,6 +38,7 @@ def get_single_packet_log_prob(model, tokenizer, packet_hex, window_size=5):
     """
     Calcola lo score sintattico (SinglePacket) usando sliding window masking sui byte.
     Eseguito UNA SOLA VOLTA per pacchetto univoco.
+    Restituisce sia la MEDIA che il MINIMO della finestra scorrevole.
     """
     packet_latin1 = hex_to_latin1(packet_hex)
     inputs = tokenizer(packet_latin1, return_tensors="pt").to(DEVICE)
@@ -48,7 +49,8 @@ def get_single_packet_log_prob(model, tokenizer, packet_hex, window_size=5):
         input_ids = input_ids[:, :-1]
         
     seq_len = input_ids.shape[1]
-    if seq_len <= window_size: return 0.0
+    if seq_len <= window_size: 
+        return 0.0, 0.0 # Ritorna tupla (mean, min)
 
     chunk_scores = []
     # Slide pixel-by-pixel (stride=1) per massima precisione
@@ -67,7 +69,10 @@ def get_single_packet_log_prob(model, tokenizer, packet_hex, window_size=5):
             window_score = token_log_probs[0, j:j+window_size].mean().item()
             chunk_scores.append(window_score)
             
-    return np.mean(chunk_scores) if chunk_scores else 0.0
+    if chunk_scores:
+        return np.mean(chunk_scores), np.min(chunk_scores)
+    else:
+        return 0.0, 0.0
 
 def get_context_log_probs(model, tokenizer, sequence_str):
     """Calcola le 5 log-probabilità per i pacchetti nel loro contesto (modello Context)."""
@@ -142,6 +147,7 @@ def process_dataset(filepath, model_single, tok_single, model_context, tok_conte
                 packet_registry[global_id] = {
                     'label': packet_labels[pos], 
                     'single_score': np.nan, 
+                    'min_single_score': np.nan, # Nuova chiave per il minimo
                     'ctx_scores': [np.nan] * SEQUENCE_LENGTH
                 }
                 
@@ -151,8 +157,10 @@ def process_dataset(filepath, model_single, tok_single, model_context, tok_conte
             # Calcolo Single Score (lo fa solo una volta per pacchetto)
             if np.isnan(packet_registry[global_id]['single_score']):
                 target_hex = hex_packets[pos]
-                s_score = get_single_packet_log_prob(model_single, tok_single, target_hex)
-                packet_registry[global_id]['single_score'] = s_score
+                # Ora spacchettiamo i due valori restituiti
+                s_mean, s_min = get_single_packet_log_prob(model_single, tok_single, target_hex)
+                packet_registry[global_id]['single_score'] = s_mean
+                packet_registry[global_id]['min_single_score'] = s_min
 
     # Creazione DataFrame Finale
     print(f"[{desc}] Creazione DataFrame...")
@@ -164,7 +172,8 @@ def process_dataset(filepath, model_single, tok_single, model_context, tok_conte
         row = {
             'Packet_ID': pid,
             'True_Label': entry['label'],
-            'Single_Score': entry['single_score']
+            'Single_Score': entry['single_score'],
+            'Min_Single_Score': entry['min_single_score'] # Aggiungiamo la colonna al row dict
         }
         for i in range(SEQUENCE_LENGTH):
             row[f'Ctx_Pos{i}'] = entry['ctx_scores'][i]
