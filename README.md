@@ -14,9 +14,10 @@ Instead of relying on Deep Packet Inspection (DPI) or handcrafted feature engine
 ## ✨ Key Features
 
 * **🧩 Protocol-Agnostic Byte-Level Modeling:** Bypasses traditional subword tokenization by decoding raw hexadecimal payloads into Latin-1, allowing the ByT5 model to natively process and reconstruct raw network bytes.
-* **⚖️ Dual-Model Ensemble Architecture:** * *Single-Packet Syntax Detection:* Captures fine-grained structural anomalies (e.g., corrupted payloads, invalid checksums) using a sliding window masking approach.
-  * *Sequence-Level Contextual Detection:* Captures sustained semantic attacks (e.g., complex response injections) using a leave-one-out masking strategy.
-* **🛡️ Zero-Day Generalization:** Operates under a strictly unsupervised/one-class paradigm. The models are trained exclusively on benign traffic using Self-Supervised Learning (Masked Language Modeling) to establish a highly precise boundary of normality.
+* **⚖️ Dual-Model Ensemble Architecture:** 
+   * *Single-Packet Syntax Detection:* Captures fine-grained structural anomalies (e.g., corrupted payloads, invalid checksums) using a sliding window masking approach.
+   * *Sequence-Level Contextual Detection:* Captures sustained semantic attacks (e.g., complex response injections) using a leave-one-out masking strategy.
+* **🛡️ Zero-Day Generalization:** Operates under a strictly one-class paradigm. The models are trained exclusively on benign traffic using Self-Supervised Learning (Masked Language Modeling) to establish a highly precise boundary of normality.
 * **📉 High Noise Tolerance:** Integrates meta-classifiers (OCSVM, Isolation Forest, Random Forest) with Exponentially Weighted Moving Average (EWMA) to smooth transient physical noise and sensor jitter common in industrial serial buses.
 
 ---
@@ -78,16 +79,16 @@ Since BLAD-SICS relies on deep transformer architectures and is optimized for CU
 ---
 ## ✒️ Author
 
-**Jacopo Momesso** [cite: 20]
+**Jacopo Momesso**
 **Institution:** University of Padova, Department of Mathematics "Tullio Levi-Civita"  
 **Academic Year:** 2025-2026
-**GitHub:** @JapoMomi
+**GitHub:** [@JapoMomi](https://github.com/JapoMomi)
 
 ### 👨‍🏫 Supervision
 This research was conducted under the supervision of:
 * **Supervisor:** Prof. Mauro Conti (University of Padova) 
-* **Co-Supervisors:** * Prof. Fabio De Gaspari (Sapienza University of Rome) 
-                      * Dr. Denis Donadel (University of Verona) 
+* **Co-Supervisors:**  Prof. Fabio De Gaspari (Sapienza University of Rome), 
+                       Dr. Denis Donadel (University of Verona) 
 
 This project was developed as part of a Master Thesis in Cybersecurity.
 
