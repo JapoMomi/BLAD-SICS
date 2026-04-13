@@ -56,8 +56,7 @@ To run this project, you will need:
 
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/yourusername/BLAD-SICS.git](https://github.com/yourusername/BLAD-SICS.git)
-   cd BLAD-SICS
+   git clone [https://github.com/JapoMomi/BLAD-SICS](https://github.com/JapoMomi/BLAD-SICS)
 
 2. Create a virtual environment:
    ```bash
@@ -80,8 +79,11 @@ Since BLAD-SICS relies on deep transformer architectures and is optimized for CU
 ## ✒️ Author
 
 **Jacopo Momesso**
+
 **Institution:** University of Padova, Department of Mathematics "Tullio Levi-Civita"  
+
 **Academic Year:** 2025-2026
+
 **GitHub:** [@JapoMomi](https://github.com/JapoMomi)
 
 ### 👨‍🏫 Supervision
