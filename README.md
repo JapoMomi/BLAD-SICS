@@ -110,7 +110,7 @@ python3 TimeContextDetection/sequenceDetection/detection.py
 ### 3. Anomaly Detection Phase
 You can now apply the different classification strategies to the reconstructed scores. Navigate to the desired directory and run the specific detection script.
 
-📝 ## Pro-Tip: Saving Outputs
+## 📝 Pro-Tip: Saving Outputs
 To run a detection script and simultaneously save its output to the corresponding output/ directory (as structured in this repository), use the tee command. For example:
 ```bash
 python3 -u DualModelDetection/oneClassClassifierDetection/OCSVM-ISODetection.py | tee DualModelDetection/oneClassClassifierDetection/output/ocsvm_results.txt
