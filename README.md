@@ -56,7 +56,7 @@ To run this project, you will need:
 
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/JapoMomi/BLAD-SICS](https://github.com/JapoMomi/BLAD-SICS)
+   git clone https://github.com/JapoMomi/BLAD-SICS.git
 
 2. Create a virtual environment:
    ```bash
