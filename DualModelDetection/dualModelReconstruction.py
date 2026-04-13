@@ -16,8 +16,8 @@ PATH_SINGLE = "/home/spritz/storage/disk0/Master_Thesis/SingplePacketDetection/B
 PATH_CONTEXT = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
 
 # Percorsi Dataset Input
-VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt"
-TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt"
+VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/validation.txt"
+TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/test.txt"
 
 # Percorsi Output CSV
 OUTPUT_VAL_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"

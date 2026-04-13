@@ -11,8 +11,8 @@ MAX_LENGTH = 512
 SEPARATOR = ' '
 
 MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
-VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt"
-TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/test.txt"
+VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/validation.txt"
+TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/test.txt"
 
 def hex_to_latin1(hex_sequence):
     """Helper: Hex String -> Latin-1 String"""
@@ -162,7 +162,7 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
         })
         val_path = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results_validation.csv"
         val_df.to_csv(val_path, index=False)
-        print(f"📁 Validation results saved to: {val_path}")
+        print(f"Validation results saved to: {val_path}")
         
         return (best_avg, best_min)
     else:
@@ -211,7 +211,7 @@ def run_detection_phase(dataset_path, model, tokenizer, device, phase_name, thre
         })
         test_path = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results_test.csv"
         test_df.to_csv(test_path, index=False)
-        print(f"📁 Test results saved to: {test_path}")
+        print(f"Test results saved to: {test_path}")
         
         return thresholds
 

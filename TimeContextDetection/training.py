@@ -12,8 +12,8 @@ from transformers import (
 
 # --- CONFIGURATION ---
 model_checkpoint = "google/byt5-small"
-train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/train.txt"
-valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits/validation.txt"
+train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/train.txt"
+valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/validation.txt"
 
 # Parametri
 SEQUENCE_LENGTH = 5  

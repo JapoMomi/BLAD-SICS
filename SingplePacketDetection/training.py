@@ -13,8 +13,8 @@ from transformers import (
 
 # --- CONFIGURATION ---
 model_checkpoint = "google/byt5-small"
-train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/train.txt"
-valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/splits/validation.txt"
+train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/singlePacketSplits/train.txt"
+valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/singlePacketSplits/validation.txt"
 
 MASK_PROB = 0.15  
 # Hyperparameters
