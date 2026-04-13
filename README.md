@@ -94,11 +94,13 @@ python TimeContextDetection/timeContext-training.py
 
 ### 2. Reconstruction Phase (Score Extraction)
 Once the models are trained, you need to extract the reconstruction log-probabilities (anomaly scores). This phase evaluates the traffic and generates the `.csv` files required for the final classification.
+
 **For Single-Packet & Dual-Model Detection:**
 ```bash
 python3 DualModelDetection/dualModelReconstruction.py
 ```
 *Note*: This generates dual_model_validation_results.csv and dual_model_detection_results.csv. These files are utilized by all single packet detection scripts.
+
 **For Sequence-Level Detection:**
 ```bash
 python3 TimeContextDetection/sequenceDetection/detection.py
@@ -108,7 +110,7 @@ python3 TimeContextDetection/sequenceDetection/detection.py
 ### 3. Anomaly Detection Phase
 You can now apply the different classification strategies to the reconstructed scores. Navigate to the desired directory and run the specific detection script.
 
-📝 Pro-Tip: Saving Outputs
+📝 ## Pro-Tip: Saving Outputs
 To run a detection script and simultaneously save its output to the corresponding output/ directory (as structured in this repository), use the tee command. For example:
 ```bash
 python3 -u DualModelDetection/oneClassClassifierDetection/OCSVM-ISODetection.py | tee DualModelDetection/oneClassClassifierDetection/output/ocsvm_results.txt
