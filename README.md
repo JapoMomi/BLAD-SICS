@@ -57,3 +57,55 @@ To run this project, you will need:
    ```bash
    git clone [https://github.com/yourusername/BLAD-SICS.git](https://github.com/yourusername/BLAD-SICS.git)
    cd BLAD-SICS
+
+2. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate 
+
+3. [!IMPORTANT] Note on PyTorch Installation: 
+Since BLAD-SICS relies on deep transformer architectures and is optimized for CUDA-enabled GPUs, we highly recommend installing the PyTorch version that specifically matches your hardware and CUDA drivers. Please follow the official PyTorch installation guide to get the correct command for your system before proceeding.
+
+4. Install remaining dependencies:
+   ```bash
+   pip install -r requirements.txt
+
+---
+
+## 💻 Usage
+
+
+---
+## ✒️ Author
+
+**Jacopo Momesso** [cite: 20]
+**Institution:** University of Padova, Department of Mathematics "Tullio Levi-Civita"  
+**Academic Year:** 2025-2026
+**GitHub:** @JapoMomi
+
+### 👨‍🏫 Supervision
+This research was conducted under the supervision of:
+* **Supervisor:** Prof. Mauro Conti (University of Padova) 
+* **Co-Supervisors:** * Prof. Fabio De Gaspari (Sapienza University of Rome) 
+                      * Dr. Denis Donadel (University of Verona) 
+
+This project was developed as part of a Master Thesis in Cybersecurity.
+
+---
+
+## 📚 References & Acknowledgements
+
+This project utilizes the enhanced Gas Pipeline SCADA dataset. If you use this dataset in your research, please ensure you cite the original authors:
+
+* **Morris, T. H., Thornton, Z., & Turnipseed, I. P. (2015).** *Industrial control system simulation and data logging for intrusion detection system research.* In 7th International Conference on Critical Infrastructure Protection.
+
+For researchers and developers, here is the BibTeX entry for the dataset reference:
+
+```bibtex
+@inproceedings{morris2015industrial,
+  title={Industrial Control System Simulation and Data Logging for Intrusion Detection System Research},
+  author={Thomas H. Morris and Zach Thornton and Ian P. Turnipseed},
+  booktitle={7th International Conference on Critical Infrastructure Protection},
+  year={2015},
+  url={https://api.semanticscholar.org/CorpusID:42986835}
+}
