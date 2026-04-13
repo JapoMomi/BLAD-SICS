@@ -1,0 +1,65 @@
+Caricamento dei risultati della Sequence Detection (Unsupervised)...
+
+Ricerca delle soglie basate sul Validation Set...
+Filtro di persistenza temporale: 3 step
+
+===========================================================================
+1. STRATEGIA 'SOLO MEDIA' (Ottimizzata per FPR: 20.0%)
+===========================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.7681    0.9222    0.8381     20980
+      Attack     0.8980    0.7109    0.7936     20211
+
+    accuracy                         0.8186     41191
+   macro avg     0.8330    0.8166    0.8159     41191
+weighted avg     0.8318    0.8186    0.8163     41191
+
+Confusion Matrix:
+[TP: 14369 | FN: 5842 ]
+[FP: 1632  | TN: 19348]
+ROC AUC (su Avg_Score): 0.8927
+ROC AUC (su Min_Score): 0.8614
+
+===========================================================================
+2. STRATEGIA 'SOLO MINIMO' (Ottimizzata per FPR: 20.0%)
+===========================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.7464    0.9086    0.8196     20980
+      Attack     0.8775    0.6795    0.7659     20211
+
+    accuracy                         0.7962     41191
+   macro avg     0.8120    0.7941    0.7927     41191
+weighted avg     0.8107    0.7962    0.7932     41191
+
+Confusion Matrix:
+[TP: 13734 | FN: 6477 ]
+[FP: 1917  | TN: 19063]
+ROC AUC (su Avg_Score): 0.8927
+ROC AUC (su Min_Score): 0.8614
+
+===========================================================================
+3. STRATEGIA 'IBRIDA [Avg OR Min]' (Ottimizzata per FPR: 20.0%)
+===========================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.8225    0.8867    0.8534     20980
+      Attack     0.8721    0.8014    0.8352     20211
+
+    accuracy                         0.8449     41191
+   macro avg     0.8473    0.8441    0.8443     41191
+weighted avg     0.8468    0.8449    0.8445     41191
+
+Confusion Matrix:
+[TP: 16197 | FN: 4014 ]
+[FP: 2376  | TN: 18604]
+ROC AUC (su Avg_Score): 0.8927
+ROC AUC (su Min_Score): 0.8614
+
+######################################################################
+ CLASSIFICA FINALE F1-SCORE (SEQUENCE DETECTION)
+######################################################################
+ 🏆 Ibrida (Media OR Minimo) : 0.8352
+ 2. Solo Media               : 0.7936
+ 3. Solo Minimo              : 0.7659

@@ -1,0 +1,61 @@
+Caricamento Dataset Sequence Detection (Pattern Interni)...
+
+Ricerca delle soglie e test delle 3 strategie...
+
+================================================================================
+STRATEGIA 1: Primo Pacchetto Anomalo | Ottimizzato su Val FPR: 20.0%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.5844    0.8027    0.6764     20980
+      Attack     0.6655    0.4075    0.5055     20211
+
+    accuracy                         0.6088     41191
+   macro avg     0.6249    0.6051    0.5909     41191
+weighted avg     0.6242    0.6088    0.5925     41191
+
+Confusion Matrix:
+[TP: 8236  | FN: 11975]
+[FP: 4140  | TN: 16840]
+ROC AUC: 0.5991
+
+================================================================================
+STRATEGIA 2: Almeno 2 Pacchetti Anomali | Ottimizzato su Val FPR: 15.0%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.7396    0.8534    0.7924     20980
+      Attack     0.8189    0.6881    0.7478     20211
+
+    accuracy                         0.7723     41191
+   macro avg     0.7792    0.7707    0.7701     41191
+weighted avg     0.7785    0.7723    0.7705     41191
+
+Confusion Matrix:
+[TP: 13907 | FN: 6304 ]
+[FP: 3076  | TN: 17904]
+ROC AUC: 0.7997
+
+================================================================================
+STRATEGIA 3: Almeno 2 Pacchetti Consecutivi | Ottimizzato su Val FPR: 15.0%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.7210    0.8609    0.7848     20980
+      Attack     0.8192    0.6541    0.7274     20211
+
+    accuracy                         0.7595     41191
+   macro avg     0.7701    0.7575    0.7561     41191
+weighted avg     0.7692    0.7595    0.7566     41191
+
+Confusion Matrix:
+[TP: 13221 | FN: 6990 ]
+[FP: 2918  | TN: 18062]
+ROC AUC: 0.7843
+
+######################################################################
+ CLASSIFICA FINALE F1-SCORE
+######################################################################
+ 🏆 Almeno 2 Pacchetti Anomali              : 0.7478
+ 2. Almeno 2 Pacchetti Consecutivi          : 0.7274
+ 3. Primo Pacchetto Anomalo                 : 0.5055

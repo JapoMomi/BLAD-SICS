@@ -1,0 +1,60 @@
+Caricamento dataset Single Packet (Unsupervised)...
+
+Ricerca della migliore soglia Unsupervised per: MEDIA (SINGLE_SCORE)...
+ -> Tolleranza Val FPR:  0.1% | Soglia:  -1.7070 | F1 Test: 0.7717
+ -> Tolleranza Val FPR:  0.5% | Soglia:  -1.2274 | F1 Test: 0.7923
+ -> Tolleranza Val FPR:  1.0% | Soglia:  -1.0397 | F1 Test: 0.7875
+ -> Tolleranza Val FPR:  2.0% | Soglia:  -0.8526 | F1 Test: 0.7808
+ -> Tolleranza Val FPR:  3.0% | Soglia:  -0.7295 | F1 Test: 0.7698
+ -> Tolleranza Val FPR:  5.0% | Soglia:  -0.5583 | F1 Test: 0.7461
+ -> Tolleranza Val FPR: 10.0% | Soglia:  -0.3019 | F1 Test: 0.6801
+ -> Tolleranza Val FPR: 15.0% | Soglia:  -0.1827 | F1 Test: 0.6207
+
+Ricerca della migliore soglia Unsupervised per: MINIMO (MIN_SINGLE_SCORE)...
+ -> Tolleranza Val FPR:  0.1% | Soglia:  -8.1171 | F1 Test: 0.7442
+ -> Tolleranza Val FPR:  0.5% | Soglia:  -6.2745 | F1 Test: 0.8142
+ -> Tolleranza Val FPR:  1.0% | Soglia:  -5.3930 | F1 Test: 0.8152
+ -> Tolleranza Val FPR:  2.0% | Soglia:  -4.5429 | F1 Test: 0.8052
+ -> Tolleranza Val FPR:  3.0% | Soglia:  -4.0207 | F1 Test: 0.7909
+ -> Tolleranza Val FPR:  5.0% | Soglia:  -3.3076 | F1 Test: 0.7485
+ -> Tolleranza Val FPR: 10.0% | Soglia:  -2.4421 | F1 Test: 0.6982
+ -> Tolleranza Val FPR: 15.0% | Soglia:  -1.8954 | F1 Test: 0.6358
+
+===========================================================================
+MIGLIOR RISULTATO: MEDIA (SINGLE_SCORE) (Ottimizzato per FPR: 0.5%)
+===========================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9144    0.9934    0.9523     32113
+      Attack     0.9666    0.6713    0.7923      9082
+
+    accuracy                         0.9224     41195
+   macro avg     0.9405    0.8324    0.8723     41195
+weighted avg     0.9259    0.9224    0.9170     41195
+
+Confusion Matrix:
+[TP: 6097  | FN: 2985 ]
+[FP: 211   | TN: 31902]
+ROC AUC: 0.8607
+
+===========================================================================
+MIGLIOR RISULTATO: MINIMO (MIN_SINGLE_SCORE) (Ottimizzato per FPR: 1.0%)
+===========================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9247    0.9888    0.9557     32113
+      Attack     0.9475    0.7153    0.8152      9082
+
+    accuracy                         0.9285     41195
+   macro avg     0.9361    0.8520    0.8854     41195
+weighted avg     0.9297    0.9285    0.9247     41195
+
+Confusion Matrix:
+[TP: 6496  | FN: 2586 ]
+[FP: 360   | TN: 31753]
+ROC AUC: 0.8633
+
+===========================================================================
+ VINCITORE ASSOLUTO TRA LE DUE METRICHE
+===========================================================================
+🏆 Il MINIMO ha performato meglio (F1-Score: 0.8152 vs 0.7923)

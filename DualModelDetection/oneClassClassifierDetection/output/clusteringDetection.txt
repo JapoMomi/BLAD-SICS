@@ -1,0 +1,119 @@
+Inizio Elaborazione Master Script...
+
+>>> ESECUZIONE EURISTICHE DI BASE <<<
+
+================================================================================
+1. HEURISTIC (Single + Min Context) | Ottimizzato su Val FPR: 0.0%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9272    0.8638    0.8944     32113
+      Attack     0.6121    0.7603    0.6782      9082
+
+    accuracy                         0.8410     41195
+   macro avg     0.7697    0.8120    0.7863     41195
+weighted avg     0.8578    0.8410    0.8467     41195
+
+Confusion Matrix:
+[TP: 6905  | FN: 2177 ]
+[FP: 4375  | TN: 27738]
+ROC AUC: 0.8934
+
+================================================================================
+2. HEURISTIC (Single + Mean Context) | Ottimizzato su Val FPR: 0.0%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9268    0.8642    0.8944     32113
+      Attack     0.6123    0.7585    0.6776      9082
+
+    accuracy                         0.8409     41195
+   macro avg     0.7695    0.8114    0.7860     41195
+weighted avg     0.8574    0.8409    0.8466     41195
+
+Confusion Matrix:
+[TP: 6889  | FN: 2193 ]
+[FP: 4362  | TN: 27751]
+ROC AUC: 0.8942
+
+>>> ESECUZIONE MACHINE LEARNING (BOUNDARY) <<<
+
+================================================================================
+3. ML: Isolation Forest | Ottimizzato su Val FPR: 4.1%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9393    0.8646    0.9004     32113
+      Attack     0.6263    0.8025    0.7035      9082
+
+    accuracy                         0.8509     41195
+   macro avg     0.7828    0.8335    0.8019     41195
+weighted avg     0.8703    0.8509    0.8570     41195
+
+Confusion Matrix:
+[TP: 7288  | FN: 1794 ]
+[FP: 4349  | TN: 27764]
+ROC AUC: 0.9033
+
+================================================================================
+4. ML: One-Class SVM | Ottimizzato su Val FPR: 0.0%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9198    0.9642    0.9415     32113
+      Attack     0.8473    0.7026    0.7682      9082
+
+    accuracy                         0.9065     41195
+   macro avg     0.8835    0.8334    0.8548     41195
+weighted avg     0.9038    0.9065    0.9033     41195
+
+Confusion Matrix:
+[TP: 6381  | FN: 2701 ]
+[FP: 1150  | TN: 30963]
+ROC AUC: 0.9130
+
+>>> ESECUZIONE MACHINE LEARNING (CLUSTERING) <<<
+
+================================================================================
+5. CLUSTERING: Gaussian Mixture Model (GMM) | Ottimizzato su Val FPR: 1.1%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9267    0.8169    0.8684     32113
+      Attack     0.5438    0.7716    0.6380      9082
+
+    accuracy                         0.8069     41195
+   macro avg     0.7353    0.7943    0.7532     41195
+weighted avg     0.8423    0.8069    0.8176     41195
+
+Confusion Matrix:
+[TP: 7008  | FN: 2074 ]
+[FP: 5879  | TN: 26234]
+ROC AUC: 0.8653
+
+================================================================================
+6. CLUSTERING: K-Means | Ottimizzato su Val FPR: 0.1%
+================================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9045    0.8944    0.8994     32113
+      Attack     0.6408    0.6662    0.6532      9082
+
+    accuracy                         0.8441     41195
+   macro avg     0.7727    0.7803    0.7763     41195
+weighted avg     0.8464    0.8441    0.8452     41195
+
+Confusion Matrix:
+[TP: 6050  | FN: 3032 ]
+[FP: 3391  | TN: 28722]
+ROC AUC: 0.8809
+
+###########################################################################
+ CLASSIFICA FINALE F1-SCORE (Approccio 100% Unsupervised)
+###########################################################################
+ 🏆 One-Class SVM                 : 0.7682
+ 2. Isolation Forest              : 0.7035
+ 3. Heuristic (Min)               : 0.6782
+ 4. Heuristic (Mean)              : 0.6776
+ 5. K-Means                       : 0.6532
+ 6. GMM (Gaussian Mixture)        : 0.6380

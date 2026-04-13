@@ -1,0 +1,101 @@
+Caricamento dati da /home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv...
+
+======================================================================
+1. EURISTICA BASE (Single + Mean Context) | Peso Single: 0.6
+======================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9230    0.9892    0.9550     32113
+      Attack     0.9487    0.7083    0.8111      9082
+
+    accuracy                         0.9272     41195
+   macro avg     0.9359    0.8487    0.8830     41195
+weighted avg     0.9287    0.9272    0.9232     41195
+
+Confusion Matrix:
+TP: 6433  | FN: 2649 
+FP: 348   | TN: 31765
+ROC AUC: 0.8602
+
+======================================================================
+2. EURISTICA AGGRESSIVA (Single + Min Context) | Peso Single: 0.7
+======================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9215    0.9934    0.9561     32113
+      Attack     0.9679    0.7006    0.8129      9082
+
+    accuracy                         0.9289     41195
+   macro avg     0.9447    0.8470    0.8845     41195
+weighted avg     0.9317    0.9289    0.9245     41195
+
+Confusion Matrix:
+TP: 6363  | FN: 2719 
+FP: 211   | TN: 31902
+ROC AUC: 0.8600
+
+======================================================================
+3. EURISTICA ESTREMA (Min_Single + Min Context) | Peso Min_Single: 0.7
+======================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9264    0.9917    0.9579     32113
+      Attack     0.9610    0.7212    0.8240      9082
+
+    accuracy                         0.9321     41195
+   macro avg     0.9437    0.8565    0.8910     41195
+weighted avg     0.9340    0.9321    0.9284     41195
+
+Confusion Matrix:
+TP: 6550  | FN: 2532 
+FP: 266   | TN: 31847
+ROC AUC: 0.8619
+
+------------------------------------------------------------
+Preparazione Feature Engineering Avanzata (ML)...
+Addestramento Meta-Model con Cross-Validation (attendere...)
+
+======================================================================
+4. ML ENSEMBLE BASE (Senza Smoothing) | Soglia Prob: 0.73
+======================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9249    0.9962    0.9592     32113
+      Attack     0.9814    0.7140    0.8266      9082
+
+    accuracy                         0.9340     41195
+   macro avg     0.9532    0.8551    0.8929     41195
+weighted avg     0.9374    0.9340    0.9300     41195
+
+Confusion Matrix:
+TP: 6485  | FN: 2597 
+FP: 123   | TN: 31990
+ROC AUC: 0.9612
+
+Applicazione Smoothing Temporale sulle Probabilità (EWMA)...
+
+======================================================================
+5. ML ENSEMBLE ADVANCED (Con Smoothing EWMA) | Soglia Prob: 0.50
+======================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9750    0.9832    0.9791     32113
+      Attack     0.9389    0.9110    0.9248      9082
+
+    accuracy                         0.9673     41195
+   macro avg     0.9570    0.9471    0.9520     41195
+weighted avg     0.9671    0.9673    0.9671     41195
+
+Confusion Matrix:
+TP: 8274  | FN: 808  
+FP: 538   | TN: 31575
+ROC AUC: 0.9796
+
+################################################################################
+ RIASSUNTO RISULTATI PER IL PAPER SCIENTIFICO
+################################################################################
+1. Euristica Base (Single + Mean Ctx):       F1-Score 0.8111
+2. Euristica Aggressiva (Single + Min Ctx):  F1-Score 0.8129
+3. Euristica Estrema (Min_Single + Min Ctx): F1-Score 0.8240
+4. ML Ensemble Base (Random Forest puro):    F1-Score 0.8266
+5. ML Ensemble Advanced (RF + Smoothing):    F1-Score 0.9248
