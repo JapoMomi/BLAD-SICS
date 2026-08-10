@@ -58,3 +58,43 @@ ROC AUC: 0.8633
  VINCITORE ASSOLUTO TRA LE DUE METRICHE
 ===========================================================================
 🏆 Il MINIMO ha performato meglio (F1-Score: 0.8152 vs 0.7923)
+
+###########################################################################
+ GENERAZIONE METRICHE AVANZATE E GRAFICI (CONCERNS 1 & 3)
+###########################################################################
+
+---------------------------------------------------------------------------
+ ADVANCED METRICS FOR REVIEWER (CONCERNS 1 & 3): Single_Packet_Mean
+---------------------------------------------------------------------------
+PR-AUC: 0.8120
+
+--- Performance at Matched FPR ---
+Target FPR: 1.12% | Actual FPR Achieved: 1.12%
+Matched Threshold: 1.0845
+F1-Score: 0.7883
+Confusion Matrix:
+[TP: 6142  | FN: 2940 ]
+[FP: 358   | TN: 31755]
+
+--- Operational Impact ---
+Estimated Alarms/Hour (Based on 24.0 hours): 14.92
+
+[+] Precision-Recall curve successfully saved as '/home/spritz/storage/disk0/Master_Thesis/ReviewerImprovements/PR_Curve_Single_Packet_Mean.png'.
+
+---------------------------------------------------------------------------
+ ADVANCED METRICS FOR REVIEWER (CONCERNS 1 & 3): Single_Packet_Min
+---------------------------------------------------------------------------
+PR-AUC: 0.8198
+
+--- Performance at Matched FPR ---
+Target FPR: 1.12% | Actual FPR Achieved: 1.12%
+Matched Threshold: 5.4109
+F1-Score: 0.8152
+Confusion Matrix:
+[TP: 6495  | FN: 2587 ]
+[FP: 358   | TN: 31755]
+
+--- Operational Impact ---
+Estimated Alarms/Hour (Based on 24.0 hours): 14.92
+
+[+] Precision-Recall curve successfully saved as '/home/spritz/storage/disk0/Master_Thesis/ReviewerImprovements/PR_Curve_Single_Packet_Min.png'.

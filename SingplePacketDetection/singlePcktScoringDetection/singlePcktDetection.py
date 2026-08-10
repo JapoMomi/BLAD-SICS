@@ -1,13 +1,18 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score
+import matplotlib.pyplot as plt  # <-- NUOVO IMPORT
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score, average_precision_score, precision_recall_curve, roc_curve # <-- NUOVI IMPORT
 
 # --- CONFIGURAZIONE ---
-VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
-TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
+VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_validation_results.csv"
+TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_detection_results.csv"
 
 # Tolleranze di Falsi Allarmi (FPR) da testare sul traffico sano (Validation)
 TARGET_FPRS = [0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0,]
+
+# --- PARAMETRI PER LE METRICHE AVANZATE (REVIEWER) ---
+TEST_SET_HOURS = 24.0     # <-- AGGIORNA QUESTO VALORE CON LE ORE REALI DEL TEST SET
+TARGET_FPR_MATCH = 0.0112 # <-- FPR 1.12% da forzare/verificare (Tabella 3)
 
 def print_report(y_true, y_pred, y_probs, title):
     print(f"\n{'='*75}\n{title}\n{'='*75}")
@@ -19,6 +24,53 @@ def print_report(y_true, y_pred, y_probs, title):
             print(f"ROC AUC: {roc_auc_score(y_true, y_probs):.4f}")
         except ValueError:
             pass
+
+def advanced_evaluation_for_reviewers(y_true, y_probs, model_name):
+    """Calcola PR-AUC, Matched FPR performance, Alarms/Hour e salva la curva PR."""
+    print(f"\n{'-'*75}")
+    print(f" ADVANCED METRICS FOR REVIEWER (CONCERNS 1 & 3): {model_name}")
+    print(f"{'-'*75}")
+
+    # 1. PR-AUC
+    pr_auc = average_precision_score(y_true, y_probs)
+    print(f"PR-AUC: {pr_auc:.4f}")
+
+    # 2. Performance at Matched FPR
+    fpr_curve, tpr_curve, thresholds_roc = roc_curve(y_true, y_probs)
+    idx = np.argmin(np.abs(fpr_curve - TARGET_FPR_MATCH))
+    matched_th = thresholds_roc[idx]
+    actual_fpr = fpr_curve[idx]
+
+    matched_preds = (y_probs > matched_th).astype(int)
+    cm = confusion_matrix(y_true, matched_preds)
+    matched_f1 = f1_score(y_true, matched_preds, zero_division=0)
+
+    print(f"\n--- Performance at Matched FPR ---")
+    print(f"Target FPR: {TARGET_FPR_MATCH*100:.2f}% | Actual FPR Achieved: {actual_fpr*100:.2f}%")
+    print(f"Matched Threshold: {matched_th:.4f}")
+    print(f"F1-Score: {matched_f1:.4f}")
+    print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
+
+    # 3. Estimated Alarms per Hour
+    fp = cm[0][1]
+    alarms_per_hour = fp / TEST_SET_HOURS
+    print(f"\n--- Operational Impact ---")
+    print(f"Estimated Alarms/Hour (Based on {TEST_SET_HOURS} hours): {alarms_per_hour:.2f}")
+
+    # 4. Save PR Curve
+    precision, recall, _ = precision_recall_curve(y_true, y_probs)
+    plt.figure(figsize=(8, 6))
+    plt.plot(recall, precision, label=f'{model_name.replace("_", " ")} (PR-AUC = {pr_auc:.4f})', color='darkred', lw=2)
+    plt.xlabel('Recall (True Positive Rate)', fontsize=12)
+    plt.ylabel('Precision (Positive Predictive Value)', fontsize=12)
+    plt.title(f'Precision-Recall Curve: {model_name.replace("_", " ")}', fontsize=14)
+    plt.legend(loc="lower left", fontsize=11)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+
+    plot_filename = f"/home/spritz/storage/disk0/Master_Thesis/ReviewerImprovements/PR_Curve_{model_name}.png"
+    plt.savefig(plot_filename, format='png', dpi=300)
+    print(f"\n[+] Precision-Recall curve successfully saved as '{plot_filename}'.")
 
 def evaluate_metric(df_val, df_test, metric_col, metric_name):
     """Calcola le soglie Unsupervised per una metrica specifica e testa i risultati."""
@@ -107,6 +159,23 @@ def main():
         print(f"🏆 La MEDIA ha performato meglio (F1-Score: {res_mean['best_f1']:.4f} vs {res_min['best_f1']:.4f})")
     else:
         print(f"🤝 Pareggio tra MINIMO e MEDIA (F1-Score: {res_min['best_f1']:.4f})")
+
+    # --- METRICHE AVANZATE E GRAFICI (NUOVA SEZIONE) ---
+    print("\n" + "#"*75)
+    print(" GENERAZIONE METRICHE AVANZATE E GRAFICI (CONCERNS 1 & 3)")
+    print("#"*75)
+    
+    advanced_evaluation_for_reviewers(
+        df_test['True_Label'].values, 
+        res_mean['inverted_scores'], 
+        model_name="Single_Packet_Mean"
+    )
+    
+    advanced_evaluation_for_reviewers(
+        df_test['True_Label'].values, 
+        res_min['inverted_scores'], 
+        model_name="Single_Packet_Min"
+    )
 
 if __name__ == "__main__":
     main()

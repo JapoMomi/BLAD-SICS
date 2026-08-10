@@ -1,11 +1,18 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score, average_precision_score, precision_recall_curve, roc_curve
+import matplotlib.pyplot as plt
 from sklearn.model_selection import cross_val_predict
 from sklearn.ensemble import RandomForestClassifier
 
 # --- CONFIGURAZIONE ---
-INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
+INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_detection_results.csv"
+
+# --- CONCERNS 1 & 3 IMPLEMENTATION ---
+# UPDATE THIS VALUE: Total real-world hours elapsed in the test set.
+TEST_SET_HOURS = 24.0  
+# The FPR achieved by the Single Packet (Min) model in Table 3 of your paper
+TARGET_FPR_MATCH = 0.0112 
 
 def print_report(y_true, y_pred, y_probs, title):
     print(f"\n{'='*70}\n{title}\n{'='*70}")
@@ -16,6 +23,60 @@ def print_report(y_true, y_pred, y_probs, title):
     print(f"FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}")
     if y_probs is not None:
         print(f"ROC AUC: {roc_auc_score(y_true, y_probs):.4f}")
+
+def advanced_evaluation_for_reviewers(y_true, y_probs, model_name="Dual-Model_OCSVM"):
+    """
+    Addresses Reviewer Concerns 1 and 3: 
+    Calculates PR-AUC, Matched FPR performance, Alarms/Hour, and plots the PR curve.
+    """
+    print(f"\n{'='*75}")
+    print(f" ADVANCED METRICS FOR REVIEWER (CONCERNS 1 & 3): {model_name}")
+    print(f"{'='*75}")
+
+    # 1. Calculate PR-AUC (Concern 1 & 3)
+    pr_auc = average_precision_score(y_true, y_probs)
+    print(f"PR-AUC: {pr_auc:.4f}")
+
+    # 2. Performance at Matched FPR (Concern 1)
+    fpr_curve, tpr_curve, thresholds_roc = roc_curve(y_true, y_probs)
+    
+    # Find the threshold that yields an FPR closest to the 1.12% target
+    idx = np.argmin(np.abs(fpr_curve - TARGET_FPR_MATCH))
+    matched_th = thresholds_roc[idx]
+    actual_fpr = fpr_curve[idx]
+
+    matched_preds = (y_probs > matched_th).astype(int)
+    cm = confusion_matrix(y_true, matched_preds)
+    matched_f1 = f1_score(y_true, matched_preds, zero_division=0)
+
+    print(f"\n--- Performance at Matched FPR ---")
+    print(f"Target FPR: {TARGET_FPR_MATCH*100:.2f}% | Actual FPR Achieved: {actual_fpr*100:.2f}%")
+    print(f"Matched Threshold: {matched_th:.4f}")
+    print(f"F1-Score: {matched_f1:.4f}")
+    print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
+
+    # 3. Estimated Alarms per Hour (Concern 3)
+    fp = cm[0][1]
+    alarms_per_hour = fp / TEST_SET_HOURS
+    print(f"\n--- Operational Impact ---")
+    print(f"Estimated Alarms/Hour (Based on {TEST_SET_HOURS} hours): {alarms_per_hour:.2f}")
+
+    # 4. Generate and Save PR Curve Plot (Concern 1)
+    precision, recall, _ = precision_recall_curve(y_true, y_probs)
+    
+    plt.figure(figsize=(8, 6))
+    plt.plot(recall, precision, label=f'{model_name.replace("_", " ")} (PR-AUC = {pr_auc:.4f})', color='darkblue', lw=2)
+    plt.xlabel('Recall (True Positive Rate)', fontsize=12)
+    plt.ylabel('Precision (Positive Predictive Value)', fontsize=12)
+    plt.title('Precision-Recall Curve', fontsize=14)
+    plt.legend(loc="lower left", fontsize=11)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+
+    # Save as high-quality PDF for LaTeX/Paper insertion
+    plot_filename = f"/home/spritz/storage/disk0/Master_Thesis/ReviewerImprovements/PR_Curve_{model_name}.png"
+    plt.savefig(plot_filename, format='png', dpi=300)
+    print(f"\n[+] Precision-Recall curve successfully saved as '{plot_filename}'.")
 
 def optimize_heuristic_mean(df):
     """Strategia Euristica 1: Z-Score sulla Media dei Contesti e Single Score Base"""
@@ -175,6 +236,10 @@ def run_ml_ensembles(df):
     print_report(y, best_preds_adv, smoothed_probs, 
                  f"5. ML ENSEMBLE ADVANCED (Con Smoothing EWMA) | Soglia Prob: {best_th_adv:.2f}")
     
+    advanced_evaluation_for_reviewers(y, raw_probs, model_name="Dual_Model_RF_Base")
+    advanced_evaluation_for_reviewers(y, smoothed_probs, model_name="Dual_Model_RF_Advanced")
+    
+
     return best_f1_base, best_f1_adv
 
 def main():
