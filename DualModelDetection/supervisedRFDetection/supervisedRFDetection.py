@@ -10,7 +10,7 @@ INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_m
 
 # --- CONCERNS 1 & 3 IMPLEMENTATION ---
 # UPDATE THIS VALUE: Total real-world hours elapsed in the test set.
-TEST_SET_HOURS = 24.0  
+TEST_SET_HOURS = 11.7  
 # The FPR achieved by the Single Packet (Min) model in Table 3 of your paper
 TARGET_FPR_MATCH = 0.0112 
 

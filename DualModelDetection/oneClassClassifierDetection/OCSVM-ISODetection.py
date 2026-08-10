@@ -14,7 +14,7 @@ VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_mod
 TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_detection_results.csv"
 
 # --- PARAMETRI PER LE METRICHE AVANZATE (REVIEWER) ---
-TEST_SET_HOURS = 24.0     # <-- AGGIORNA QUESTO VALORE CON LE ORE REALI DEL TEST SET
+TEST_SET_HOURS = 11.7     # <-- AGGIORNA QUESTO VALORE CON LE ORE REALI DEL TEST SET
 TARGET_FPR_MATCH = 0.0112 # FPR 1.12% dal Single Packet (Min) Model
 
 def prep_features(df):

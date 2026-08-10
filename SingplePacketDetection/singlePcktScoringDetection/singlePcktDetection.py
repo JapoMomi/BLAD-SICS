@@ -11,7 +11,7 @@ TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_mo
 TARGET_FPRS = [0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0,]
 
 # --- PARAMETRI PER LE METRICHE AVANZATE (REVIEWER) ---
-TEST_SET_HOURS = 24.0     # <-- AGGIORNA QUESTO VALORE CON LE ORE REALI DEL TEST SET
+TEST_SET_HOURS = 11.7     # <-- AGGIORNA QUESTO VALORE CON LE ORE REALI DEL TEST SET
 TARGET_FPR_MATCH = 0.0112 # <-- FPR 1.12% da forzare/verificare (Tabella 3)
 
 def print_report(y_true, y_pred, y_probs, title):

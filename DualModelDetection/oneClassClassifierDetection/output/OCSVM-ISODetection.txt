@@ -62,7 +62,7 @@ Confusion Matrix:
 [FP: 365   | TN: 31748]
 
 --- Operational Impact ---
-Estimated Alarms/Hour (Based on 24.0 hours): 15.21
+Estimated Alarms/Hour (Based on 11.7 hours): 31.20
 
 [+] Precision-Recall curve successfully saved as '/home/spritz/storage/disk0/Master_Thesis/ReviewerImprovements/PR_Curve_Dual_Model_OCSVM.png'.
 
@@ -80,6 +80,6 @@ Confusion Matrix:
 [FP: 358   | TN: 31755]
 
 --- Operational Impact ---
-Estimated Alarms/Hour (Based on 24.0 hours): 14.92
+Estimated Alarms/Hour (Based on 11.7 hours): 30.60
 
 [+] Precision-Recall curve successfully saved as '/home/spritz/storage/disk0/Master_Thesis/ReviewerImprovements/PR_Curve_Dual_Model_IForest.png'.

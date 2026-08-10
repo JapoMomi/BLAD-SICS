@@ -3,8 +3,8 @@ import numpy as np
 import os
 
 # --- USER CONFIGURATION ---
-FULL_DATASET_FILE = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/IanRawDataset.txt" 
-OUTPUT_DIR = "/home/spritz/storage/disk0/Master_Thesis/Dataset_newVersion/splits"
+FULL_DATASET_FILE = "/home/spritz/storage/disk0/Master_Thesis/Dataset/IanRawDataset.txt" 
+OUTPUT_DIR = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits"
 
 SEQUENCE_LENGTH = 5
 SEPARATOR = ' '
@@ -108,9 +108,16 @@ if __name__ == "__main__":
     test_normal_count = len(test_lbls) - test_anomalous_count
     total_test_seqs = len(test_lbls)
 
+    # --- Calcolo del tempo del Test Set ---
+    min_ts = df_test['ts_float'].min()
+    max_ts = df_test['ts_float'].max()
+    test_duration_seconds = max_ts - min_ts
+    test_duration_hours = test_duration_seconds / 3600.0
+
     print("\n=============================================")
     print("      ANALISI FINALE DEL TEST SET            ")
     print("=============================================")
+    print(f"Durata Fisica del Test Set: {test_duration_hours:.2f} Ore ({test_duration_seconds:.2f} Secondi)")
     print(f"Sequenze Normali: {test_normal_count} ({ (test_normal_count/total_test_seqs)*100:.2f}% )")
     print(f"Sequenze Anomale: {test_anomalous_count} ({ (test_anomalous_count/total_test_seqs)*100:.2f}% )")
     print("=============================================\n")
