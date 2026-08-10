@@ -56,7 +56,17 @@ PR-AUC: 0.8854
 --- Performance at Matched FPR ---
 Target FPR: 1.12% | Actual FPR Achieved: 1.14%
 Matched Threshold: 1.7692
-F1-Score: 0.7783
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.9120    0.9886    0.9488     32113
+      Attack     0.9428    0.6626    0.7783      9082
+
+    accuracy                         0.9168     41195
+   macro avg     0.9274    0.8256    0.8635     41195
+weighted avg     0.9188    0.9168    0.9112     41195
+
 Confusion Matrix:
 [TP: 6018  | FN: 3064 ]
 [FP: 365   | TN: 31748]
@@ -74,7 +84,17 @@ PR-AUC: 0.8287
 --- Performance at Matched FPR ---
 Target FPR: 1.12% | Actual FPR Achieved: 1.12%
 Matched Threshold: -0.0627
-F1-Score: 0.7943
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Benign     0.9173    0.9889    0.9517     32113
+      Attack     0.9456    0.6848    0.7943      9082
+
+    accuracy                         0.9218     41195
+   macro avg     0.9314    0.8368    0.8730     41195
+weighted avg     0.9235    0.9218    0.9170     41195
+
 Confusion Matrix:
 [TP: 6219  | FN: 2863 ]
 [FP: 358   | TN: 31755]

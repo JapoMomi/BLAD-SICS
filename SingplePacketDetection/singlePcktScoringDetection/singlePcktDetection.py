@@ -11,7 +11,7 @@ TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_mo
 TARGET_FPRS = [0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0,]
 
 # --- PARAMETRI PER LE METRICHE AVANZATE (REVIEWER) ---
-TEST_SET_HOURS = 11.7     # <-- AGGIORNA QUESTO VALORE CON LE ORE REALI DEL TEST SET
+TEST_SET_HOURS = 76.58     # <-- AGGIORNA QUESTO VALORE CON LE ORE REALI DEL TEST SET
 TARGET_FPR_MATCH = 0.0112 # <-- FPR 1.12% da forzare/verificare (Tabella 3)
 
 def print_report(y_true, y_pred, y_probs, title):
@@ -43,12 +43,15 @@ def advanced_evaluation_for_reviewers(y_true, y_probs, model_name):
 
     matched_preds = (y_probs > matched_th).astype(int)
     cm = confusion_matrix(y_true, matched_preds)
-    matched_f1 = f1_score(y_true, matched_preds, zero_division=0)
-
+    
+    # Generate the full classification report
+    report = classification_report(y_true, matched_preds, digits=4, target_names=["Benign", "Attack"], zero_division=0)
     print(f"\n--- Performance at Matched FPR ---")
     print(f"Target FPR: {TARGET_FPR_MATCH*100:.2f}% | Actual FPR Achieved: {actual_fpr*100:.2f}%")
     print(f"Matched Threshold: {matched_th:.4f}")
-    print(f"F1-Score: {matched_f1:.4f}")
+    # Print the full table instead of just the F1-score
+    print("\nClassification Report:")
+    print(report)
     print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
 
     # 3. Estimated Alarms per Hour

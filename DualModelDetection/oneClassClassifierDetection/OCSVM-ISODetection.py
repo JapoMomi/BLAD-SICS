@@ -129,12 +129,15 @@ def advanced_evaluation_for_reviewers(y_true, y_probs, model_name):
 
     matched_preds = (y_probs > matched_th).astype(int)
     cm = confusion_matrix(y_true, matched_preds)
-    matched_f1 = f1_score(y_true, matched_preds, zero_division=0)
-
+    
+    # Generate the full classification report
+    report = classification_report(y_true, matched_preds, digits=4, target_names=["Benign", "Attack"], zero_division=0)
     print(f"\n--- Performance at Matched FPR ---")
     print(f"Target FPR: {TARGET_FPR_MATCH*100:.2f}% | Actual FPR Achieved: {actual_fpr*100:.2f}%")
     print(f"Matched Threshold: {matched_th:.4f}")
-    print(f"F1-Score: {matched_f1:.4f}")
+    # Print the full table instead of just the F1-score
+    print("\nClassification Report:")
+    print(report)
     print(f"Confusion Matrix:\n[TP: {cm[1][1]:<5} | FN: {cm[1][0]:<5}]\n[FP: {cm[0][1]:<5} | TN: {cm[0][0]:<5}]")
 
     # 3. Estimated Alarms per Hour
@@ -146,7 +149,7 @@ def advanced_evaluation_for_reviewers(y_true, y_probs, model_name):
     # 4. Save PR Curve
     precision, recall, _ = precision_recall_curve(y_true, y_probs)
     plt.figure(figsize=(8, 6))
-    plt.plot(recall, precision, label=f'{model_name.replace("_", " ")} (PR-AUC = {pr_auc:.4f})', color='darkblue', lw=2)
+    plt.plot(recall, precision, label=f'{model_name.replace("_", " ")} (PR-AUC = {pr_auc:.4f})', color='darkred', lw=2)
     plt.xlabel('Recall (True Positive Rate)', fontsize=12)
     plt.ylabel('Precision (Positive Predictive Value)', fontsize=12)
     plt.title(f'Precision-Recall Curve: {model_name.replace("_", " ")}', fontsize=14)
@@ -157,7 +160,6 @@ def advanced_evaluation_for_reviewers(y_true, y_probs, model_name):
     plot_filename = f"/home/spritz/storage/disk0/Master_Thesis/ReviewerImprovements/PR_Curve_{model_name}.png"
     plt.savefig(plot_filename, format='png', dpi=300)
     print(f"\n[+] Precision-Recall curve successfully saved as '{plot_filename}'.")
-
 def main():
     print("Caricamento Dataset...")
     try:
