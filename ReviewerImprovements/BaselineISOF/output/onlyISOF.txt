@@ -1,0 +1,31 @@
+===========================================================================
+ TRIVIAL BASELINE: BYTE N-GRAM + ISOLATION FOREST (SINGLE PACKET)
+===========================================================================
+Lettura pacchetti da /home/spritz/storage/disk0/Master_Thesis/Dataset/singlePacketSplits/validation.txt...
+Lettura pacchetti da /home/spritz/storage/disk0/Master_Thesis/Dataset/singlePacketSplits/test.txt...
+
+Estrazione dei 2-grammi di byte (Feature Engineering Statistica)...
+Vocabolario estratto: 24664 n-grammi unici.
+
+Addestramento Isolation Forest (100 stimatori)...
+Calcolo degli anomaly scores...
+
+Calcolo della soglia al 20.0% FPR sul Validation Set...
+Soglia calcolata: -0.1843
+
+===========================================================================
+ RISULTATI BASELINE (TEST SET SINGOLI PACCHETTI)
+===========================================================================
+              precision    recall  f1-score   support
+
+      Benign     0.9111    0.8010    0.8525     21458
+      Attack     0.0989    0.2186    0.1362      2145
+
+    accuracy                         0.7480     23603
+   macro avg     0.5050    0.5098    0.4944     23603
+weighted avg     0.8373    0.7480    0.7874     23603
+
+Confusion Matrix:
+[TP: 469   | FN: 1676 ]
+[FP: 4271  | TN: 17187]
+ROC AUC: 0.5059
