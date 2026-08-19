@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score
+import os 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURAZIONE ---
-VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results_validation.csv"
-TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/sequenceDetection_mean+min_Threshold/detection_detailed_results.csv"
+VAL_FILE = os.path.join(SCRIPT_DIR, "detection_detailed_results_validation.csv")
+TEST_FILE = os.path.join(SCRIPT_DIR, "detection_detailed_results.csv")
 
 TARGET_FPRS = [0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0]
 

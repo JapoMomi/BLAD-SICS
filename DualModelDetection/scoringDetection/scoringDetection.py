@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
+import os 
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, f1_score
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURAZIONE PERCORSI ---
-VAL_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
-TEST_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
+VAL_FILE = os.path.join(SCRIPT_DIR, "../dual_model_validation_results.csv")
+TEST_FILE = os.path.join(SCRIPT_DIR, "../dual_model_detection_results.csv")
 
 # Tolleranze FPR da testare sul Validation
 PERCENTILES_TO_TEST = [0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0, 10.0, 15.0, 20.0]

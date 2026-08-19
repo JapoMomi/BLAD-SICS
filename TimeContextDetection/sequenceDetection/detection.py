@@ -4,15 +4,17 @@ import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix, f1_score
+import os 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURATION ---
 SEQUENCE_LENGTH = 5
 MAX_LENGTH = 512
 SEPARATOR = ' '
 
-MODEL_PATH = f"/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
-VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/validation.txt"
-TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/test.txt"
+MODEL_PATH = os.path.join(SCRIPT_DIR, "../Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned")
+VAL_PATH = os.path.join(SCRIPT_DIR, "../../Dataset/timeContextSplits/validation.txt")
+TEST_PATH = os.path.join(SCRIPT_DIR, "../../Dataset/timeContextSplits/test.txt")
 
 def hex_to_latin1(hex_sequence):
     """Helper: Hex String -> Latin-1 String"""

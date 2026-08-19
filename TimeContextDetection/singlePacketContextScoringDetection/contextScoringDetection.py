@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, f1_score
+import os 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURAZIONE PERCORSI ---
-VAL_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
-TEST_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
+VAL_CSV = os.path.join(SCRIPT_DIR, "../../DualModelDetection/dual_model_validation_results.csv")
+TEST_CSV = os.path.join(SCRIPT_DIR, "../../DualModelDetection/dual_model_detection_results.csv")
 
 CTX_COLS = ['Ctx_Pos0', 'Ctx_Pos1', 'Ctx_Pos2', 'Ctx_Pos3', 'Ctx_Pos4']
 

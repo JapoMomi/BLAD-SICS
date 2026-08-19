@@ -10,11 +10,13 @@ from transformers import (
     Seq2SeqTrainingArguments,
     T5ForConditionalGeneration,
 )
+import os 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURATION ---
 model_checkpoint = "google/byt5-small"
-train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/singlePacketSplits/train.txt"
-valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/singlePacketSplits/validation.txt"
+TRAIN_FILE = os.path.join(SCRIPT_DIR, "../Dataset/timeContextSplits/train.txt")
+VALID_FILE = os.path.join(SCRIPT_DIR, "./Dataset/timeContextSplits/validation.txt")
 
 MASK_PROB = 0.15  
 # Hyperparameters
@@ -130,11 +132,11 @@ if __name__ == "__main__":
     #    "csv", 
     #    sep=",", 
     #    names=COLUMN_NAMES, 
-    #    data_files={"train": [train_file], "valid": [valid_file]}
+    #    data_files={"train": [TRAIN_FILE], "valid": [VALID_FILE]}
     #)
     print("Loading data via Pandas to avoid SegFault...")
-    train_df = pd.read_csv(train_file, names=COLUMN_NAMES, header=None, dtype=str)
-    valid_df = pd.read_csv(valid_file, names=COLUMN_NAMES, header=None, dtype=str)
+    train_df = pd.read_csv(TRAIN_FILE, names=COLUMN_NAMES, header=None, dtype=str)
+    valid_df = pd.read_csv(VALID_FILE, names=COLUMN_NAMES, header=None, dtype=str)
     train_dataset = datasets.Dataset.from_pandas(train_df)
     valid_dataset = datasets.Dataset.from_pandas(valid_df)
     dataset = datasets.DatasetDict({

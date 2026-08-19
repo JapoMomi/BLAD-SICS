@@ -4,7 +4,9 @@ import numpy as np
 import torch.nn.functional as F
 from tqdm import tqdm
 from transformers import AutoTokenizer, T5ForConditionalGeneration
+import os 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURAZIONE ---
 SEQUENCE_LENGTH = 5
 MAX_LENGTH = 512
@@ -12,16 +14,16 @@ SEPARATOR = ' '
 MASK_TOKEN_ID = 258 # <extra_id_0> per ByT5 [cite: 2026-01-07]
 
 # Percorsi Modelli
-PATH_SINGLE = "/home/spritz/storage/disk0/Master_Thesis/SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned"
-PATH_CONTEXT = "/home/spritz/storage/disk0/Master_Thesis/TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned"
+PATH_SINGLE = os.path.join(SCRIPT_DIR, "../SingplePacketDetection/Byt5/BYTES_modbus-single_packet-finetuned")
+PATH_CONTEXT = os.path.join(SCRIPT_DIR, "../TimeContextDetection/Byt5/BYTES_modbus-sequence_5_ALLMasked-finetuned")
 
 # Percorsi Dataset Input
-VAL_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/validation.txt"
-TEST_PATH = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/test.txt"
+VAL_PATH = os.path.join(SCRIPT_DIR, "../Dataset/timeContextSplits/validation.txt")
+TEST_PATH = os.path.join(SCRIPT_DIR, "../Dataset/timeContextSplits/test.txt")
 
 # Percorsi Output CSV
-OUTPUT_VAL_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
-OUTPUT_TEST_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
+OUTPUT_VAL_CSV = os.path.join(SCRIPT_DIR, "../DualModelDetection/dual_model_validation_results.csv")
+OUTPUT_TEST_CSV =  os.path.join(SCRIPT_DIR, "../DualModelDetection/dual_model_detection_results.csv")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

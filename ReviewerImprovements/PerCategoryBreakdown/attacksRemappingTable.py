@@ -2,13 +2,12 @@ import pandas as pd
 import numpy as np
 from sklearn.svm import OneClassSVM
 from sklearn.preprocessing import RobustScaler
-import warnings
-warnings.filterwarnings('ignore')
-
+import os
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURAZIONE PERCORSI ---
-FULL_DATASET_FILE = "/home/spritz/storage/disk0/Master_Thesis/Dataset/IanRawDataset.txt"
-VAL_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_validation_results.csv"
-TEST_CSV = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_detection_results.csv"
+FULL_DATASET_FILE = os.path.join(SCRIPT_DIR, "../../Dataset/IanRawDataset.txt")
+VAL_CSV = os.path.join(SCRIPT_DIR, "../../DualModelDetection/dual_model_validation_results.csv")
+TEST_CSV = os.path.join(SCRIPT_DIR, "../../DualModelDetection/dual_model_detection_results.csv")
 
 COL_IDX_LABEL1 = 2  
 COL_IDX_TIME = 5

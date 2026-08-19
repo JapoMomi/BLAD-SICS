@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt  # <-- NUOVO IMPORT
+import matplotlib.pyplot as plt 
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, roc_auc_score, average_precision_score, precision_recall_curve, roc_curve # <-- NUOVI IMPORT
+import os 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURAZIONE ---
-VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_validation_results.csv"
-TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_detection_results.csv"
+VAL_FILE = os.path.join(SCRIPT_DIR, "../../DualModelDetection/dual_model_validation_results.csv")
+TEST_FILE = os.path.join(SCRIPT_DIR, "../../DualModelDetection/dual_model_detection_results.csv")
 
 # Tolleranze di Falsi Allarmi (FPR) da testare sul traffico sano (Validation)
 TARGET_FPRS = [0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0,]

@@ -1,14 +1,15 @@
 import csv
+import os
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURAZIONE PERCORSI ---
-
-VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/Dataset/singlePacketSplits/validation.txt"
-TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/Dataset/singlePacketSplits/test.txt"
+VAL_FILE = os.path.join(SCRIPT_DIR, "../../Dataset/singlePacketSplits/validation.txt")
+TEST_FILE = os.path.join(SCRIPT_DIR, "../../Dataset/singlePacketSplits/test.txt")
 
 TARGET_FPR = 20.0 
 

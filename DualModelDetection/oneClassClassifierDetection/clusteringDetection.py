@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, f1_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
@@ -7,11 +8,11 @@ from sklearn.svm import OneClassSVM
 from sklearn.mixture import GaussianMixture
 from sklearn.cluster import KMeans
 from sklearn.neighbors import LocalOutlierFactor
-import warnings
 
-# --- CONFIGURAZIONE ---
-VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_validation_results.csv"
-TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualApprachDetection/dual_model_detection_results.csv"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# --- CONFIGURAZIONE PERCORSI ---
+VAL_FILE = os.path.join(SCRIPT_DIR, "../dual_model_validation_results.csv")
+TEST_FILE = os.path.join(SCRIPT_DIR, "../dual_model_detection_results.csv")
 
 # Tolleranze di Falsi Allarmi (FPR) da testare sul Validation Set
 TARGET_FPRS = np.arange(0.01, 10.1, 0.02) # Da 0.1% a 5.0%

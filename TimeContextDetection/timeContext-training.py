@@ -9,11 +9,13 @@ from transformers import (
     Seq2SeqTrainingArguments,
     T5ForConditionalGeneration,
 )
+import os 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- CONFIGURATION ---
 model_checkpoint = "google/byt5-small"
-train_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/train.txt"
-valid_file = "/home/spritz/storage/disk0/Master_Thesis/Dataset/timeContextSplits/validation.txt"
+TRAIN_FILE = os.path.join(SCRIPT_DIR, "../Dataset/timeContextSplits/train.txt")
+VALID_FILE = os.path.join(SCRIPT_DIR, "./Dataset/timeContextSplits/validation.txt")
 
 # Parametri
 SEQUENCE_LENGTH = 5  
@@ -97,8 +99,8 @@ if __name__ == "__main__":
     # sep="," -> Il file ha virgole che separano la sequenza dalle label numeriche
     # usecols=[0] -> Carichiamo SOLO la prima colonna (la sequenza di pacchetti)
     # names=["packet"] -> Assegniamo il nome per riferirci dopo
-    train_df = pd.read_csv(train_file, sep=",", header=None, usecols=[0], names=["packet"], dtype=str)
-    valid_df = pd.read_csv(valid_file, sep=",", header=None, usecols=[0], names=["packet"], dtype=str)
+    train_df = pd.read_csv(TRAIN_FILE, sep=",", header=None, usecols=[0], names=["packet"], dtype=str)
+    valid_df = pd.read_csv(VALID_FILE, sep=",", header=None, usecols=[0], names=["packet"], dtype=str)
     
     # Rimuoviamo eventuali righe vuote o NaN generate dal parsing
     train_df = train_df.dropna()

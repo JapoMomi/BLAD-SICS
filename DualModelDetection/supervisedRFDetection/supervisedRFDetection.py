@@ -4,9 +4,11 @@ from sklearn.metrics import classification_report, confusion_matrix, f1_score, r
 import matplotlib.pyplot as plt
 from sklearn.model_selection import cross_val_predict
 from sklearn.ensemble import RandomForestClassifier
+import os 
 
-# --- CONFIGURAZIONE ---
-INPUT_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_detection_results.csv"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# --- CONFIGURAZIONE PERCORSI ---
+INPUT_FILE = os.path.join(SCRIPT_DIR, "../dual_model_detection_results.csv")
 
 # --- CONCERNS 1 & 3 IMPLEMENTATION ---
 # UPDATE THIS VALUE: Total real-world hours elapsed in the test set.

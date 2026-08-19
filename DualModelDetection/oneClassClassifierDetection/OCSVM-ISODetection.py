@@ -1,20 +1,19 @@
 import pandas as pd
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, roc_auc_score, classification_report, confusion_matrix, average_precision_score, precision_recall_curve, roc_curve
 from sklearn.svm import OneClassSVM
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import RobustScaler
-import warnings
 
-warnings.filterwarnings('ignore')
-
-# --- CONFIGURAZIONE ---
-VAL_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_validation_results.csv"
-TEST_FILE = "/home/spritz/storage/disk0/Master_Thesis/DualModelDetection/dual_model_detection_results.csv"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# --- CONFIGURAZIONE PERCORSI ---
+VAL_FILE = os.path.join(SCRIPT_DIR, "../dual_model_validation_results.csv")
+TEST_FILE = os.path.join(SCRIPT_DIR, "../dual_model_detection_results.csv")
 
 # --- PARAMETRI PER LE METRICHE AVANZATE (REVIEWER) ---
-TEST_SET_HOURS = 11.7     # <-- AGGIORNA QUESTO VALORE CON LE ORE REALI DEL TEST SET
+TEST_SET_HOURS = 11.7  
 TARGET_FPR_MATCH = 0.0112 # FPR 1.12% dal Single Packet (Min) Model
 
 def prep_features(df):
@@ -157,9 +156,10 @@ def advanced_evaluation_for_reviewers(y_true, y_probs, model_name):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
 
-    plot_filename = f"/home/spritz/storage/disk0/Master_Thesis/ReviewerImprovements/PR_Curve_{model_name}.png"
-    plt.savefig(plot_filename, format='png', dpi=300)
+    plot_filename = os.path.join(SCRIPT_DIR, f"../../ReviewerImprovements/PR_Curve_{model_name}.pdf")
+    plt.savefig(plot_filename, format='pdf', dpi=300)
     print(f"\n[+] Precision-Recall curve successfully saved as '{plot_filename}'.")
+
 def main():
     print("Caricamento Dataset...")
     try:
